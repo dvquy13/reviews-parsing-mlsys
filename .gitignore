@@ -1,0 +1,14 @@
+**/*-checkpoint.ipynb
+**/*.pyc
+.vscode/
+
+.venv/
+.env
+
+data/*
+!data/.gitkeep
+
+notebooks/*
+!notebooks/*.ipynb
+
+**/*.log

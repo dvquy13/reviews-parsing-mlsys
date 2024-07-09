@@ -1,0 +1,45 @@
+[tool.poetry]
+name = "reviews-parsing-mlsys"
+version = "0.1.0"
+description = ""
+authors = ["Quy Dinh <quy.dinh3195@gmail.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.9"
+pandas = "^2.2.2"
+scikit-learn = "*"
+openai = "^1.35.7"
+python-dotenv = "^1.0.1"
+
+# Download HuggingFace datasets via Pandas API
+pyarrow = "*"
+# Issue with load_dataset so need to fix fsspec: https://stackoverflow.com/a/77433141/7456751
+fsspec = "2023.9.2"
+huggingface-hub = "^0.23.4"
+# HuggingFace datasets
+datasets = "^2.16"
+
+# spacy is used to convert to IOB2 format
+spacy = "^3.7.5"
+
+# Needed for tutorial notebook: https://huggingface.co/learn/nlp-course/en/chapter7/2
+evaluate = "^0.4.2"
+transformers = {extras = ["sentencepiece"], version = "^4.42.3"}
+accelerate = "^0.32.0"
+seqeval = "^1.2.2"
+ollama = "^0.2.1"
+loguru = "^0.7.2"
+
+# MLflow
+mlflow = "2.14.1"
+
+[tool.poetry.group.dev.dependencies]
+jupyterlab = "^4.2.3"
+ipywidgets = "^8.1.3"
+black = "^24.4.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
