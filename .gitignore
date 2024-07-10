@@ -13,3 +13,6 @@ notebooks/*
 
 **/*.log
 **/nohup.out
+
+**/.terraform*
+**/*.tfstate*
