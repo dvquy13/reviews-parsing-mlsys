@@ -26,14 +26,18 @@ spacy = "^3.7.5"
 
 # Needed for tutorial notebook: https://huggingface.co/learn/nlp-course/en/chapter7/2
 evaluate = "^0.4.2"
-transformers = {extras = ["sentencepiece"], version = "^4.42.3"}
+# At July 10 we are suggested to use version 4.41.0 at max to avoid compatibility issues with MLflow
+# Ref: The 'transformers' MLflow Models integration is known to be compatible with the following package version ranges: ``4.25.1`` -  ``4.41.0``. MLflow Models integrations with transformers may not succeed when used with package versions outside of this range.
+transformers = {extras = ["sentencepiece"], version = "4.41.0"}
 accelerate = "^0.32.0"
 seqeval = "^1.2.2"
 ollama = "^0.2.1"
 loguru = "^0.7.2"
 
 # MLflow
-mlflow = "2.14.1"
+mlflow = "2.14.2"
+# Somehow needed for logging Trasnformers model to MLflow 
+torchvision = "*"
 
 [tool.poetry.group.dev.dependencies]
 jupyterlab = "^4.2.3"

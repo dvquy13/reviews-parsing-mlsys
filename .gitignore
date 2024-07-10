@@ -12,3 +12,4 @@ notebooks/*
 !notebooks/*.ipynb
 
 **/*.log
+**/nohup.out
