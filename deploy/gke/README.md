@@ -7,6 +7,19 @@
 export $(cat ../../.env.$ENV | grep -v "^#")
 ```
 
+# Set up VPA
+
+```
+kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=$GCLOUD_ACCOUNT
+
+git clone https://github.com/kubernetes/autoscaler.git
+cd autoscaler/vertical-pod-autoscaler && \
+  ./hack/vpa-up.sh && \
+  cd ../..
+```
+
+---
+
 # Set up Traffic Exposure via Ingress NGINX
 
 Ref:
@@ -56,10 +69,13 @@ helm upgrade --install \
 
 # Install MLflow
 ```
+# Install with Helm
 helm upgrade --install mlflow oci://registry-1.docker.io/bitnamicharts/mlflow -f ../services/mlflow/values.yaml && \
   export MLFLOW_TRACKING_PASSWORD=$(kubectl get secret --namespace default mlflow-tracking -o jsonpath="{.data.admin-password }" | base64 -d) && \
   sed -i "s/^MLFLOW_TRACKING_PASSWORD=.*/MLFLOW_TRACKING_PASSWORD=$MLFLOW_TRACKING_PASSWORD/" ../../.env.$ENV && \
   echo "Try access MLflow UI at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/mlflow with $MLFLOW_TRACKING_USERNAME/$MLFLOW_TRACKING_PASSWORD"
+# Apply VPA
+kubectl apply -f ../services/mlflow/vpa.yaml
 ```
 
 ---
@@ -69,6 +85,26 @@ helm upgrade --install mlflow oci://registry-1.docker.io/bitnamicharts/mlflow -f
 ./delete-installed.sh
 ```
 
+---
+
+# Edit VPA's Updater min-replicas from 2 to 1 so that updater can update resource requests based on recommendation
+
+> [!CAUTION]
+> Use this with caution. Should only use to test VPA function or when you know what you're doing.
+> Known issues: VPA MLflow Tracking Server continuously crashes, probably due to miscalculation from VPA.
+
+Ref: https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/FAQ.md#what-are-the-parameters-to-vpa-updater
+
+> - Run `kubectl edit deploy vpa-updater -n kube-system` to edit Updater deployment
+> - Add args to container like this:
+>   ```
+>   containers:
+>   - name: updater
+>     image: registry.k8s.io/autoscaling/vpa-updater:0.10.0
+>     args:
+>     - --min-replicas=1
+>     # other existing args
+>   ```
 
 ---
 

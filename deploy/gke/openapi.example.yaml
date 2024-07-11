@@ -1,7 +1,7 @@
 swagger: "2.0"
 info:
-  description: "[Dev] Reviews Parsing MLSys"
-  title: "[Dev] Reviews Parsing MLSys"
+  description: "[<ENV>] Reviews Parsing MLSys"
+  title: "[<ENV>] Reviews Parsing MLSys"
   version: "0.1.0"
 host: "<ENV>-<APP_NAME>.endpoints.<GCP_PROJECT_ID>.cloud.goog"
 x-google-endpoints:

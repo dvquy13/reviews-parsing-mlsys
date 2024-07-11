@@ -1,0 +1,51 @@
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: mlflow-minio-vpa
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind:       Deployment
+    name:       mlflow-minio
+  updatePolicy:
+    updateMode: "Auto"
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: mlflow-run-vpa
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind:       Deployment
+    name:       mlflow-run
+  updatePolicy:
+    updateMode: "Auto"
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: mlflow-tracking-vpa
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind:       Deployment
+    name:       mlflow-tracking
+  updatePolicy:
+    updateMode: "Auto"
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: mlflow-postgresql-vpa
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind:       StatefulSet
+    name:       mlflow-postgresql
+  updatePolicy:
+    updateMode: "Auto"
