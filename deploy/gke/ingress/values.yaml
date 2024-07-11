@@ -1,0 +1,5 @@
+env:
+
+appName: reviews-parsing-mlsys
+
+gcpProjectName:

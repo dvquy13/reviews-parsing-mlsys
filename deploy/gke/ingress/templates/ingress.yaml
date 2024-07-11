@@ -1,0 +1,59 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-mlflow-api
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.regional-static-ip-name: {{ .Values.appName }}-{{ .Values.env }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: "/api/$2"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - {{ include "mainIngress.hostUrl" . }}
+      secretName: {{ include "mainIngress.fullName" . }}-tls
+  rules:
+    - host: {{ include "mainIngress.hostUrl" . }}
+      http:
+        paths:
+          - pathType: ImplementationSpecific
+            # path: /
+            path: /mlflow/api(/|$)(.*)
+            backend:
+              service:
+                name: mlflow-tracking
+                port:
+                  number: 80
+
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-mlflow
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.regional-static-ip-name: {{ .Values.appName }}-{{ .Values.env }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - {{ include "mainIngress.hostUrl" . }}
+      secretName: {{ include "mainIngress.fullName" . }}-tls
+  rules:
+    - host: {{ include "mainIngress.hostUrl" . }}
+      http:
+        paths:
+          - pathType: ImplementationSpecific
+            path: /mlflow(/|$)(.*)
+            backend:
+              service:
+                name: mlflow-tracking
+                port:
+                  number: 80

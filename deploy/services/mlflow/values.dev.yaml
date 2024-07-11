@@ -1,0 +1,8 @@
+tracking:
+  service:
+    type: ClusterIP
+  extraArgs:
+    - "--static-prefix=/mlflow"
+  extraEnvVars:
+    - name: GUNICORN_CMD_ARGS
+      value: "--log-level debug"

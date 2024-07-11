@@ -1,0 +1,9 @@
+tracking:
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hostname: dev.mlflow.gke
+    tls: true
+    selfSigned: true
