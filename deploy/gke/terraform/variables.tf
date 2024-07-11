@@ -1,3 +1,9 @@
+variable "app_name" {
+  description = "The main name of the application"
+  type        = string
+  default     = "reviews-parsing-mlsys"
+}
+
 variable "project_id" {
   description = "The project ID to deploy to"
   type        = string
@@ -52,8 +58,21 @@ variable "hp_node_machine_type" {
   default     = "e2-standard-4"
 }
 
+variable "disk_type" {
+  description = "The disk type for the GKE nodes"
+  type        = string
+  default     = "pd-standard"
+}
+
 variable "disk_size" {
   description = "The disk size for the GKE nodes"
   type        = number
-  default     = 100
+  # Reduce from 100 to 70 due to suddenly got this error: `Quota 'SSD_TOTAL_GB' exceeded. Limit: 250.0 in region`
+  default = 70
+}
+
+variable "env" {
+  description = "The environment (e.g. dev, staging, prod)"
+  type        = string
+  default     = ""
 }

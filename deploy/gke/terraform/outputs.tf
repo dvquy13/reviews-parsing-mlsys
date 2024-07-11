@@ -5,3 +5,7 @@ output "cluster_name" {
 output "endpoint" {
   value = google_container_cluster.primary.endpoint
 }
+
+output "main_ingress_static_ip_address" {
+  value = google_compute_address.main_ingress_static_ip.address
+}

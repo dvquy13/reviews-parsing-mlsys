@@ -1,7 +1,8 @@
 resource "google_container_cluster" "primary" {
-  name               = var.cluster_name
-  location           = var.zone
-  initial_node_count = 1
+  name                = var.cluster_name
+  location            = var.zone
+  initial_node_count  = 1
+  deletion_protection = false
 
   min_master_version       = var.cluster_version
   remove_default_node_pool = true
@@ -46,6 +47,7 @@ resource "google_container_node_pool" "default" {
   node_config {
     machine_type = var.default_node_machine_type
     disk_size_gb = var.disk_size
+    disk_type    = var.disk_type
     image_type   = "COS_CONTAINERD"
     preemptible  = true
 
@@ -87,6 +89,7 @@ resource "google_container_node_pool" "high_perf" {
 
   node_config {
     machine_type = var.hp_node_machine_type
+    disk_type    = var.disk_type
     disk_size_gb = var.disk_size
     image_type   = "COS_CONTAINERD"
     preemptible  = true
@@ -109,4 +112,9 @@ resource "google_container_node_pool" "high_perf" {
       enable_secure_boot          = true
     }
   }
+}
+
+resource "google_compute_address" "main_ingress_static_ip" {
+  name   = "${var.env}-${var.app_name}"
+  region = var.region
 }

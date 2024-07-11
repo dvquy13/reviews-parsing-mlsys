@@ -3,3 +3,9 @@ env:
 appName: reviews-parsing-mlsys
 
 gcpProjectName:
+
+emailForCertIssuer:
+
+# Use staging for development to avoid rate limit. Once done can switch to prod.
+letsencryptIssuer: letsencrypt-staging
+# letsencryptIssuer: letsencrypt-prod

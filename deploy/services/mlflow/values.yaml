@@ -1,9 +1,8 @@
 tracking:
   service:
     type: ClusterIP
-  ingress:
-    enabled: true
-    ingressClassName: nginx
-    hostname: dev.mlflow.gke
-    tls: true
-    selfSigned: true
+  extraArgs:
+    - "--static-prefix=/mlflow"
+  extraEnvVars:
+    - name: GUNICORN_CMD_ARGS
+      value: "--log-level debug"

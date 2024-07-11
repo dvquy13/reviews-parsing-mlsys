@@ -14,32 +14,23 @@ Ref:
 - https://kk-shichao.medium.com/expose-service-using-nginx-ingress-in-kind-cluster-from-wsl2-14492e153e99
 
 ```
-# Check list of static IP address
-gcloud compute addresses list
-
-# Ref: https://serverfault.com/questions/796881/error-creating-gce-load-balancer-requested-address-ip-is-neither-static-nor-ass
-# Must create regional static IP address (global not work)
-# Choose the same region as your GKE cluster
-gcloud compute addresses create $APP_NAME-$ENV --region $GCP_REGION
 # Get IP_ADDRESS
-export IP_ADDRESS=$(gcloud compute addresses list | grep $APP_NAME-$ENV | awk '{print $2}') && echo $IP_ADDRESS
+export IP_ADDRESS=$(gcloud compute addresses list | grep $ENV-$APP_NAME | awk '{print $2}') && echo $IP_ADDRESS
 
 ## Create Nginx Ingress Controller to listen to request from the static IP
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
-helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx --set controller.service.loadBalancerIP=$IP_ADDRESS
-
-kubectl wait --for=condition=ready pod --all --timeout=300s
+helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx --set controller.service.loadBalancerIP=$IP_ADDRESS && \
+  kubectl wait --for=condition=ready pod --all --timeout=300s && \
+  sed -i 's/target: ".*"/target: "'"$IP_ADDRESS"'"/g' openapi.$ENV.yaml
 ```
-
-> - Update openapi-$ENV.yaml with `<IP_ADDRESS>`
 
 ```
 # Set up Cloud Endpoint to map domain with IP
 gcloud endpoints services deploy openapi.$ENV.yaml
 ```
 
-# Cert Manager to add TLS
+## Cert Manager to add TLS
 Ref: Install with Helm: https://cert-manager.io/docs/installation/helm/
 ```
 helm repo add jetstack https://charts.jetstack.io --force-update
@@ -49,14 +40,11 @@ helm install \
   --namespace cert-manager \
   --create-namespace \
   --version v1.15.0 \
-  --set crds.enabled=true
-
-kubectl wait --namespace cert-manager --for=condition=ready --all pod --timeout=300s
-
-kubectl apply -f cert-issuer.$ENV.yaml
+  --set crds.enabled=true && \
+  kubectl wait --namespace cert-manager --for=condition=ready --all pod --timeout=300s
 ```
 
-# Install our custom Ingress
+## Install our custom Ingress
 ```
 helm upgrade --install \
   --set env=$ENV \
@@ -66,31 +54,19 @@ helm upgrade --install \
   -f ingress/values.yaml
 ```
 
-# Install MLflow directly from Bitnami
+# Install MLflow
 ```
-helm upgrade --install mlflow oci://registry-1.docker.io/bitnamicharts/mlflow -f ../services/mlflow/values.$ENV.yaml
-
-export MLFLOW_TRACKING_PASSWORD=$(kubectl get secret --namespace default mlflow-tracking -o jsonpath="{.data.admin-password }" | base64 -d)
-sed -i "s/^MLFLOW_TRACKING_PASSWORD=.*/MLFLOW_TRACKING_PASSWORD=$MLFLOW_TRACKING_PASSWORD/" ../../.env.$ENV
+helm upgrade --install mlflow oci://registry-1.docker.io/bitnamicharts/mlflow -f ../services/mlflow/values.yaml && \
+  export MLFLOW_TRACKING_PASSWORD=$(kubectl get secret --namespace default mlflow-tracking -o jsonpath="{.data.admin-password }" | base64 -d) && \
+  sed -i "s/^MLFLOW_TRACKING_PASSWORD=.*/MLFLOW_TRACKING_PASSWORD=$MLFLOW_TRACKING_PASSWORD/" ../../.env.$ENV && \
+  echo "Try access MLflow UI at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/mlflow with $MLFLOW_TRACKING_USERNAME/$MLFLOW_TRACKING_PASSWORD"
 ```
-
-> [!NOTE] Manual
-> - Access MLflow UI at $ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/mlflow
-
 
 ---
 
 # Delete all resources
 ```
-helm list | awk 'NR>1 {print $1}' | xargs helm delete
-kubectl delete --all ing
-kubectl delete --all secret
-kubectl get cm | grep -v "kube" | awk 'NR>1 {print $1}' | xargs kubectl delete cm
-kubectl delete --all pvc
-kubectl delete --all pv
-kubectl delete --all po
-kubectl delete ns cert-manager
-kubectl delete -f cert-issuer.$ENV.yaml
+./delete-installed.sh
 ```
 
 
