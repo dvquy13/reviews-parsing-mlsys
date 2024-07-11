@@ -3,7 +3,6 @@ kind: Ingress
 metadata:
   name: {{ .Release.Name }}-mlflow-api
   annotations:
-    kubernetes.io/ingress.class: "nginx"
     kubernetes.io/ingress.regional-static-ip-name: {{ .Values.appName }}-{{ .Values.env }}
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     cert-manager.io/issuer: "letsencrypt-prod"
@@ -35,7 +34,6 @@ kind: Ingress
 metadata:
   name: {{ .Release.Name }}-mlflow
   annotations:
-    kubernetes.io/ingress.class: "nginx"
     kubernetes.io/ingress.regional-static-ip-name: {{ .Values.appName }}-{{ .Values.env }}
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     cert-manager.io/issuer: "letsencrypt-prod"

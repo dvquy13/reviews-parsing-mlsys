@@ -4,7 +4,7 @@
 
 ```
 # Init the env vars
-export $(cat ../../.$ENV.dev | grep -v "^#")
+export $(cat ../../.env.$ENV | grep -v "^#")
 ```
 
 # Set up Traffic Exposure via Ingress NGINX
@@ -27,11 +27,7 @@ export IP_ADDRESS=$(gcloud compute addresses list | grep $APP_NAME-$ENV | awk '{
 ## Create Nginx Ingress Controller to listen to request from the static IP
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
-# Set admissionWebhook to false to enable two ingress w.r.t. to one hostname and path
-# Ref: https://github.com/kubernetes/ingress-nginx/issues/8216#issuecomment-1029586665
-# To solve the MLflow issue of serving both UI and API behind reverse proxy
-# Ref: https://github.com/mlflow/mlflow/issues/4484
-helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx --set controller.service.loadBalancerIP=$IP_ADDRESS --set controller.admissionWebhooks.enabled=false
+helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx --set controller.service.loadBalancerIP=$IP_ADDRESS
 
 kubectl wait --for=condition=ready pod --all --timeout=300s
 ```
@@ -74,9 +70,47 @@ helm upgrade --install \
 ```
 helm upgrade --install mlflow oci://registry-1.docker.io/bitnamicharts/mlflow -f ../services/mlflow/values.$ENV.yaml
 
-echo Password: $(kubectl get secret --namespace default mlflow-tracking -o jsonpath="{.data.admin-password }" | base64 -d)
+export MLFLOW_TRACKING_PASSWORD=$(kubectl get secret --namespace default mlflow-tracking -o jsonpath="{.data.admin-password }" | base64 -d)
+sed -i "s/^MLFLOW_TRACKING_PASSWORD=.*/MLFLOW_TRACKING_PASSWORD=$MLFLOW_TRACKING_PASSWORD/" ../../.env.$ENV
 ```
 
 > [!NOTE] Manual
-> - Save the password to variable `MLFLOW_TRACKING_PASSWORD` in `../../.env.$ENV`
 > - Access MLflow UI at $ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/mlflow
+
+
+---
+
+# Delete all resources
+```
+helm list | awk 'NR>1 {print $1}' | xargs helm delete
+kubectl delete --all ing
+kubectl delete --all secret
+kubectl get cm | grep -v "kube" | awk 'NR>1 {print $1}' | xargs kubectl delete cm
+kubectl delete --all pvc
+kubectl delete --all pv
+kubectl delete --all po
+kubectl delete ns cert-manager
+kubectl delete -f cert-issuer.$ENV.yaml
+```
+
+
+---
+
+# Archive
+
+## Troubleshoot
+
+### Set admissionWebhook to false to enable two ingress w.r.t. to one hostname and path
+
+Error:
+```
+Error: UPGRADE FAILED: failed to create resource: admission webhook "validate.nginx.ingress.kubernetes.io" denied the request: host "XXX" and path "/mlflow/api(/|$)(.*)" is already defined in ingress default/main-ingress-mlflow
+```
+
+Workaround:
+```
+# Ref: https://github.com/kubernetes/ingress-nginx/issues/8216#issuecomment-1029586665
+# To solve the MLflow issue of serving both UI and API behind reverse proxy
+# Ref: https://github.com/mlflow/mlflow/issues/4484
+# helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx --set controller.service.loadBalancerIP=$IP_ADDRESS --set controller.admissionWebhooks.enabled=false
+```
