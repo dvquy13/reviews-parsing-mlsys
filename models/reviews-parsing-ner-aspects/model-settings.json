@@ -1,0 +1,7 @@
+{
+    "name": "reviews-parsing-ner-aspects",
+    "implementation": "model.CustomTransformersModel",
+    "parameters": {
+        "uri": "models:/reviews-parsing-ner-aspects@champion"
+    }
+}
