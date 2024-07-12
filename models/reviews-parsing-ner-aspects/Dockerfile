@@ -4,17 +4,24 @@ FROM python:3.9.19-slim
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy the necessary files into the container
-COPY model-settings.json model.py requirements.no-gpu.txt settings.json /app/
-
-# Install dependencies
+# Install Torch first because it's required but slowed to install
 RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential && \
-    pip install torch==2.3.1+cpu torchvision==0.18.1+cpu --index-url https://download.pytorch.org/whl/cpu && \
-    pip install -r requirements.no-gpu.txt && \
+    pip install torch==2.3.1+cpu --index-url https://download.pytorch.org/whl/cpu && \
     apt-get remove -y build-essential && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
+
+# Copy only the requirements file first to leverage Docker layer caching
+COPY requirements.no-gpu.txt /app/
+
+RUN pip install -r requirements.no-gpu.txt && \
+    apt-get remove -y build-essential && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy the rest of the application files
+COPY model-settings.json model.py settings.json /app/
 
 # Set the entrypoint
 ENTRYPOINT ["mlserver", "start", "."]
