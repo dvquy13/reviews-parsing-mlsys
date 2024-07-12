@@ -19,3 +19,6 @@ poetry env use ./.venv/bin/python
 # This command will automatically install all packages specified in `poetry.lock` file.
 poetry install
 ```
+
+# Set up GKE
+GKE installation is located at `deploy/gke`

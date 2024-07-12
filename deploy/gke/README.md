@@ -85,7 +85,7 @@ kubectl apply -f ../services/mlflow/vpa.yaml
 
 ---
 
-# Install KServe
+# Deploy Model Inference Service to K8s with KServe
 
 Ref:
 - https://knative.dev/docs/install/yaml-install/serving/install-serving-with-yaml/#prerequisites
@@ -118,12 +118,14 @@ export ISTIO_IP=$(kubectl --namespace istio-system get service istio-ingressgate
 kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.14.1/serving-default-domain.yaml
 ```
 
-> [!WARNING] Update Istio Resource Request to free up allocable
+> [!WARNING]
+> If you encounter unschedulable error with the Inference Service, consider update Istio Resource Request to free up allocable:
 > - `kubectl edit deploy istio-ingressgateway`, change request 1 CPU and 1Gi Memory to 200m CPU and 200Mi Memory
 > - `kubectl edit deploy istiod`, change request 500m CPU and 2Gi Memory to 200m CPU and 300Mi Memory
 > - Delete all the unscheduled/pending deployments
 
-> [!NOTE] At this point we should have configured a domain $ISTIO_IP.sslip.io for application
+> [!NOTE]
+> At this point the FQDN `$ISTIO_IP.sslip.io` should already be available
 
 ## Install KServe
 ```
@@ -133,7 +135,8 @@ kubectl apply -f https://github.com/kserve/kserve/releases/download/v0.13.0/kser
 
 ## Configure Knative cluster to deploy images from private registry
 
-> [!NOTE] Update the ../../.env.$ENV file with the PRIVATE_REGISTRY_* credentials
+> [!NOTE]
+> Update the `../../.env.$ENV` file with the `PRIVATE_REGISTRY_*` credentials
 
 Ref: https://knative.dev/docs/serving/deploying-from-private-registry/
 ```
@@ -148,8 +151,9 @@ kubectl create secret --namespace default docker-registry $REGISTRY_CREDENTIAL_S
 ## Deploy the MLServer
 
 ### Create app-secret
-> [!WARNING] Be careful to submit .env with inline comment or single quote.
-> We may need to preprocess them
+> [!WARNING]
+> Be careful to submit `.env` with single quote enclosing values.
+> We may need to preprocess them to make the `--from-env-file` work.
 ```
 kubectl create secret generic app-secret --from-env-file=../../.env.$ENV
 ```
@@ -159,7 +163,8 @@ kubectl create secret generic app-secret --from-env-file=../../.env.$ENV
 kubectl apply -f ../services/kserve/inference.yaml --namespace default
 ```
 
-> [!NOTE] If successfully deploy, we can access http://reviews-parsing-ner-aspects-mlserver.default.$ISTIO_IP.sslip.io/v2/models/reviews-parsing-ner-aspects/docs
+> [!NOTE]
+> If successfully deploy, we can access `http://reviews-parsing-ner-aspects-mlserver.default.$ISTIO_IP.sslip.io/v2/models/reviews-parsing-ner-aspects/docs` using our browser
 > to check out the Model Swagger Doc.
 
 Test inference:
