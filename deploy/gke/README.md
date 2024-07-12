@@ -135,8 +135,8 @@ kubectl apply -f https://github.com/kserve/kserve/releases/download/v0.13.0/kser
 
 ## Configure Knative cluster to deploy images from private registry
 
-> [!NOTE]
-> Update the `../../.env.$ENV` file with the `PRIVATE_REGISTRY_*` credentials
+> [!IMPORTANT]
+> Update the `../../.env.$ENV` file with your own `PRIVATE_REGISTRY_*` credentials
 
 Ref: https://knative.dev/docs/serving/deploying-from-private-registry/
 ```
@@ -163,7 +163,7 @@ kubectl create secret generic app-secret --from-env-file=../../.env.$ENV
 kubectl apply -f ../services/kserve/inference.yaml --namespace default
 ```
 
-> [!NOTE]
+> [!TIP]
 > If successfully deploy, we can access `http://reviews-parsing-ner-aspects-mlserver.default.$ISTIO_IP.sslip.io/v2/models/reviews-parsing-ner-aspects/docs` using our browser
 > to check out the Model Swagger Doc.
 
