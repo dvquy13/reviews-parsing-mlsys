@@ -1,0 +1,20 @@
+# Copy requirements.txt from MLflow Model Registry
+mlflow==2.14.2
+accelerate==0.32.1
+cffi==1.16.0
+defusedxml==0.7.1
+dill==0.3.8
+numpy==1.26.4
+packaging==24.1
+protobuf==4.25.3
+pyyaml==6.0.1
+requests==2.32.3
+scikit-learn==1.5.1
+scipy==1.13.1
+sentencepiece==0.2.0
+# torch==2.3.1
+# torchvision==0.18.1
+transformers==4.41.0
+# Manually add other packages
+mlserver==1.6.0
+loguru==0.7.2
