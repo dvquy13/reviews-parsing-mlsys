@@ -24,3 +24,5 @@ notebooks/*
 # cert-issuer.yaml files contain email address
 **/cert-issuer.*.yaml
 !**/cert-issuer.example.yaml
+
+**/.secret*

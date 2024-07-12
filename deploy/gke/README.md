@@ -1,11 +1,14 @@
 # Install apps in GKE Cluster
 
+> - `cd <ROOT>/deploy/gke`
 > - Run `export ENV=<ENV>` with the target <ENV>, for example: `export ENV=dev`
 
 ```
 # Init the env vars
 export $(cat ../../.env.$ENV | grep -v "^#")
 ```
+
+---
 
 # Set up VPA
 
@@ -67,6 +70,8 @@ helm upgrade --install \
   -f ingress/values.yaml
 ```
 
+---
+
 # Install MLflow
 ```
 # Install with Helm
@@ -76,6 +81,111 @@ helm upgrade --install mlflow oci://registry-1.docker.io/bitnamicharts/mlflow -f
   echo "Try access MLflow UI at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/mlflow with $MLFLOW_TRACKING_USERNAME/$MLFLOW_TRACKING_PASSWORD"
 # Apply VPA
 kubectl apply -f ../services/mlflow/vpa.yaml
+```
+
+---
+
+# Install KServe
+
+Ref:
+- https://knative.dev/docs/install/yaml-install/serving/install-serving-with-yaml/#prerequisites
+
+## Install cosign
+```
+# Ref: https://docs.sigstore.dev/system_config/installation/
+LATEST_VERSION=$(curl https://api.github.com/repos/sigstore/cosign/releases/latest | grep tag_name | cut -d : -f2 | tr -d "v\", ")
+curl -O -L "https://github.com/sigstore/cosign/releases/latest/download/cosign_${LATEST_VERSION}_amd64.deb"
+sudo dpkg -i cosign_${LATEST_VERSION}_amd64.deb
+```
+
+## Install required CRDs
+```
+kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.14.1/serving-crds.yaml
+```
+
+## Install core components of Knative Serving
+```
+kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.14.1/serving-core.yaml
+```
+
+## Install Networking Layer with Istio
+```
+kubectl apply -l knative.dev/crd-install=true -f https://github.com/knative/net-istio/releases/download/knative-v1.14.1/istio.yaml
+kubectl apply -f https://github.com/knative/net-istio/releases/download/knative-v1.14.1/istio.yaml
+kubectl apply -f https://github.com/knative/net-istio/releases/download/knative-v1.14.1/net-istio.yaml
+export ISTIO_IP=$(kubectl --namespace istio-system get service istio-ingressgateway | awk 'NR>1 {print $4}') && \
+  sed -i "s/^ISTIO_IP=.*/ISTIO_IP=$ISTIO_IP/" ../../.env.$ENV
+kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.14.1/serving-default-domain.yaml
+```
+
+> [!WARNING] Update Istio Resource Request to free up allocable
+> - `kubectl edit deploy istio-ingressgateway`, change request 1 CPU and 1Gi Memory to 200m CPU and 200Mi Memory
+> - `kubectl edit deploy istiod`, change request 500m CPU and 2Gi Memory to 200m CPU and 300Mi Memory
+> - Delete all the unscheduled/pending deployments
+
+> [!NOTE] At this point we should have configured a domain $ISTIO_IP.sslip.io for application
+
+## Install KServe
+```
+kubectl apply -f https://github.com/kserve/kserve/releases/download/v0.13.0/kserve.yaml
+kubectl apply -f https://github.com/kserve/kserve/releases/download/v0.13.0/kserve-cluster-resources.yaml
+```
+
+## Configure Knative cluster to deploy images from private registry
+
+> [!NOTE] Update the ../../.env.$ENV file with the PRIVATE_REGISTRY_* credentials
+
+Ref: https://knative.dev/docs/serving/deploying-from-private-registry/
+```
+export $(cat ../../.env.$ENV | grep -v "^#")
+kubectl create secret --namespace default docker-registry $REGISTRY_CREDENTIAL_SECRETS \
+  --docker-server=$PRIVATE_REGISTRY_URL \
+  --docker-email=$PRIVATE_REGISTRY_EMAIL \
+  --docker-username=$PRIVATE_REGISTRY_USER \
+  --docker-password=$PRIVATE_REGISTRY_PASSWORD
+```
+
+## Deploy the MLServer
+
+### Create app-secret
+> [!WARNING] Be careful to submit .env with inline comment or single quote.
+> We may need to preprocess them
+```
+kubectl create secret generic app-secret --from-env-file=../../.env.$ENV
+```
+
+### Deploy the inferenceservice
+```
+kubectl apply -f ../services/kserve/inference.yaml --namespace default
+```
+
+> [!NOTE] If successfully deploy, we can access http://reviews-parsing-ner-aspects-mlserver.default.$ISTIO_IP.sslip.io/v2/models/reviews-parsing-ner-aspects/docs
+> to check out the Model Swagger Doc.
+
+Test inference:
+```
+curl -X 'POST' \
+  "http://reviews-parsing-ner-aspects-mlserver.default.$ISTIO_IP.sslip.io/v2/models/reviews-parsing-ner-aspects/infer" \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "id": "string",
+  "parameters": {
+    "content_type": "string",
+    "headers": {},
+    "additionalProp1": {}
+  },
+  "inputs": [
+    {
+      "name": "input-0",
+      "shape": [
+        2
+      ],
+      "datatype": "BYTES",
+      "data": ["Delicious food friendly staff and one good celebration!", "What an amazing dining experience"]
+    }
+  ]
+}'
 ```
 
 ---

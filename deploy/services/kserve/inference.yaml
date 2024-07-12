@@ -1,0 +1,32 @@
+apiVersion: "serving.kserve.io/v1beta1"
+kind: "InferenceService"
+metadata:
+  name: "reviews-parsing-ner-aspects-mlserver"
+spec:
+  predictor:
+    imagePullSecrets:
+    - name: reviews-parsing-ner-aspects-container-registry
+    containers:
+      - name: "mlserver"
+        image: "dvquy13/reviews-parsing-ner-aspects:0.1.2"
+        ports:
+          - containerPort: 8080
+            protocol: TCP
+        env:
+          - name: PROTOCOL
+            value: "v2"
+          - name: MLFLOW_TRACKING_URI
+            valueFrom:
+              secretKeyRef:
+                name: app-secret
+                key: MLFLOW_TRACKING_URI
+          - name: MLFLOW_TRACKING_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: app-secret
+                key: MLFLOW_TRACKING_USERNAME
+          - name: MLFLOW_TRACKING_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: app-secret
+                key: MLFLOW_TRACKING_PASSWORD
