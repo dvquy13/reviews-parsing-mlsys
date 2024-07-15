@@ -55,3 +55,33 @@ spec:
                 name: mlflow-tracking
                 port:
                   number: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-grafana
+  namespace: monitoring
+  annotations:
+    kubernetes.io/ingress.regional-static-ip-name: {{ .Values.appName }}-{{ .Values.env }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/issuer: {{ .Values.letsencryptIssuer }}
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - {{ include "mainIngress.hostUrl" . }}
+      secretName: {{ include "mainIngress.fullName" . }}-tls
+  rules:
+    - host: {{ include "mainIngress.hostUrl" . }}
+      http:
+        paths:
+          - pathType: ImplementationSpecific
+            path: /grafana(/|$)(.*)
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 80

@@ -218,6 +218,28 @@ curl -X 'POST' \
 
 ---
 
+# Observability
+
+## Prometheus and Grafana
+```
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+helm upgrade --install prometheus prometheus-community/prometheus \
+  --namespace monitoring --create-namespace
+
+helm upgrade --install grafana grafana/grafana \
+  -f ../services/grafana/values.yaml \
+  --set 'grafana\.ini'.server.root_url=https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/grafana \
+  --namespace monitoring
+export GRAFANA_ADMIN_PASSWORD=$(kubectl get secret --namespace monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo)
+sed -i "s/^GRAFANA_ADMIN_PASSWORD=.*/GRAFANA_ADMIN_PASSWORD=$GRAFANA_ADMIN_PASSWORD/" ../../.env.$ENV
+```
+
+Connecting Grafana with Prometheus Data Source via this URL: `http://prometheus-server.monitoring.svc.cluster.local:80`
+
+---
+
 # Delete all resources
 ```
 ./delete-installed.sh
