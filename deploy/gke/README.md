@@ -34,10 +34,10 @@ Ref:
 export IP_ADDRESS=$(gcloud compute addresses list | grep $ENV-$APP_NAME | awk '{print $2}') && echo $IP_ADDRESS
 
 ## Create Nginx Ingress Controller to listen to request from the static IP
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm repo update
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && \
+helm repo update && \
 helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx --set controller.service.loadBalancerIP=$IP_ADDRESS && \
-  kubectl wait --for=condition=ready pod --all --timeout=300s && \
+kubectl wait --for=condition=ready pod --all --timeout=300s && \
   sed -i 's/target: ".*"/target: "'"$IP_ADDRESS"'"/g' openapi.$ENV.yaml
 ```
 
@@ -49,15 +49,15 @@ gcloud endpoints services deploy openapi.$ENV.yaml
 ## Cert Manager to add TLS
 Ref: Install with Helm: https://cert-manager.io/docs/installation/helm/
 ```
-helm repo add jetstack https://charts.jetstack.io --force-update
-helm repo update
+helm repo add jetstack https://charts.jetstack.io --force-update && \
+helm repo update && \
 helm install \
   cert-manager jetstack/cert-manager \
   --namespace cert-manager \
   --create-namespace \
   --version v1.15.0 \
   --set crds.enabled=true && \
-  kubectl wait --namespace cert-manager --for=condition=ready --all pod --timeout=300s
+kubectl wait --namespace cert-manager --for=condition=ready --all pod --timeout=300s
 ```
 
 ## Install our custom Ingress
@@ -85,6 +85,17 @@ kubectl apply -f ../services/mlflow/vpa.yaml
 
 ---
 
+# Model training
+
+The next section works by assuming that we already have a trained model named `reviews-parsing-ner-aspects@champion`.
+
+> [!NOTE]
+> To create this model: 
+> - Run the notebooks/train.ipynb notebook
+> - Register and create the alias `champion` for the trained model on MLflow
+
+---
+
 # Deploy Model Inference Service to K8s with KServe
 
 Ref:
@@ -96,6 +107,7 @@ Ref:
 LATEST_VERSION=$(curl https://api.github.com/repos/sigstore/cosign/releases/latest | grep tag_name | cut -d : -f2 | tr -d "v\", ")
 curl -O -L "https://github.com/sigstore/cosign/releases/latest/download/cosign_${LATEST_VERSION}_amd64.deb"
 sudo dpkg -i cosign_${LATEST_VERSION}_amd64.deb
+rm -rf cosign_${LATEST_VERSION}_amd64.deb
 ```
 
 ## Install required CRDs
@@ -120,9 +132,10 @@ kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1
 
 > [!WARNING]
 > If you encounter unschedulable error with the Inference Service, consider update Istio Resource Request to free up allocable:
-> - `kubectl edit deploy istio-ingressgateway`, change request 1 CPU and 1Gi Memory to 200m CPU and 200Mi Memory
-> - `kubectl edit deploy istiod`, change request 500m CPU and 2Gi Memory to 200m CPU and 300Mi Memory
+> - `kubectl edit deploy istio-ingressgateway --namespace istio-system`, change request 1 CPU and 1Gi Memory to 200m CPU and 200Mi Memory
+> - `kubectl edit deploy istiod --namespace istio-system`, change request 500m CPU and 2Gi Memory to 200m CPU and 300Mi Memory
 > - Delete all the unscheduled/pending deployments
+> - TODO: Modify the installation instruction to download the manifest and modify the resources request there instead.
 
 > [!NOTE]
 > At this point the FQDN `$ISTIO_IP.sslip.io` should already be available
@@ -148,6 +161,14 @@ kubectl create secret --namespace default docker-registry $REGISTRY_CREDENTIAL_S
   --docker-password=$PRIVATE_REGISTRY_PASSWORD
 ```
 
+## Push the MLServer Inference Docker to Dockerhub
+```
+cd ../../models/reviews-parsing-ner-aspects
+make build
+make push
+cd ../../deploy/gke
+```
+
 ## Deploy the MLServer
 
 ### Create app-secret
@@ -161,6 +182,8 @@ kubectl create secret generic app-secret --from-env-file=../../.env.$ENV
 ### Deploy the inferenceservice
 ```
 kubectl apply -f ../services/kserve/inference.yaml --namespace default
+kubectl wait --for=condition=ready pod -l app=reviews-parsing-ner-aspects-mlserver-predictor-00001 --timeout=300s
+echo "Access the KServe docs at: http://reviews-parsing-ner-aspects-mlserver.default.$ISTIO_IP.sslip.io/v2/models/reviews-parsing-ner-aspects/docs"
 ```
 
 > [!TIP]

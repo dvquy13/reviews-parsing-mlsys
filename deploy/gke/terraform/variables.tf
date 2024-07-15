@@ -13,7 +13,7 @@ variable "project_id" {
 variable "cluster_version" {
   description = "The Kubernetes version for the GKE cluster"
   type        = string
-  default     = "1.29.4-gke.1043004"
+  default     = "1.29.6-gke.1038001"
 }
 
 variable "region" {
