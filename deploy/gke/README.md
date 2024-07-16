@@ -238,6 +238,9 @@ sed -i "s/^GRAFANA_ADMIN_PASSWORD=.*/GRAFANA_ADMIN_PASSWORD=$GRAFANA_ADMIN_PASSW
 
 Connecting Grafana with Prometheus Data Source via this URL: `http://prometheus-server.monitoring.svc.cluster.local:80`
 
+Starter Grafana Dashboard:
+- K8s Resource Monitoring: id=`17375`
+
 ---
 
 # Delete all resources

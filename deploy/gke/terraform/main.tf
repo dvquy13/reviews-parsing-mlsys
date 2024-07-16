@@ -26,6 +26,10 @@ resource "google_container_cluster" "primary" {
   logging_service       = "logging.googleapis.com/kubernetes"
   monitoring_service    = "monitoring.googleapis.com/kubernetes"
   enable_shielded_nodes = true
+
+  cluster_autoscaling {
+    autoscaling_profile = "OPTIMIZE_UTILIZATION"
+  }
 }
 
 resource "google_container_node_pool" "default" {
