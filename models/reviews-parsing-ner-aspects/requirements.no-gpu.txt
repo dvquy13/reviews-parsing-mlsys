@@ -17,4 +17,4 @@ loguru==0.7.2
 # OpenTelemetry
 opentelemetry-api
 opentelemetry-sdk
-opentelemetry-exporter-jaeger
+opentelemetry-exporter-otlp-proto-http

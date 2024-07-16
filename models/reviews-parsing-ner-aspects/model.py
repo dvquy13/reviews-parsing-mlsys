@@ -5,36 +5,23 @@ from mlserver.codecs import StringCodec
 from mlserver.types import InferenceRequest, InferenceResponse, ResponseOutput
 import mlflow
 
-from opentelemetry import trace
-from opentelemetry.exporter.jaeger.thrift import JaegerExporter
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-trace.set_tracer_provider(
-    TracerProvider(
-        resource=Resource.create({SERVICE_NAME: "reviews-parsing-ner-aspects-mlserver"})
-    )
+# Service name is required for most backends
+resource = Resource(attributes={SERVICE_NAME: "rpna-mlserver"})
+
+traceProvider = TracerProvider(resource=resource)
+processor = BatchSpanProcessor(
+    OTLPSpanExporter(endpoint="http://jaeger:4318/v1/traces")
 )
+traceProvider.add_span_processor(processor)
+trace.set_tracer_provider(traceProvider)
 tracer = trace.get_tracer(__name__)
-
-# create a JaegerExporter
-jaeger_exporter = JaegerExporter(
-    # configure agent
-    agent_host_name="jaeger",
-    agent_port=6831,
-    # optional: configure also collector
-    # collector_endpoint='http://localhost:14268/api/traces?format=jaeger.thrift',
-    # username=xxxx, # optional
-    # password=xxxx, # optional
-    # max_tag_value_length=None # optional
-)
-
-# Create a BatchSpanProcessor and add the exporter to it
-span_processor = BatchSpanProcessor(jaeger_exporter)
-
-# Add to the tracer
-trace.get_tracer_provider().add_span_processor(span_processor)
 
 
 class CustomTransformersModel(MLModel):
@@ -55,8 +42,8 @@ class CustomTransformersModel(MLModel):
                 input_texts = StringCodec.decode_input(payload.inputs[0])
                 logger.info(f"{input_texts=}")
 
-                # Make predictions
             with tracer.start_as_current_span("predict") as span:
+                # Make predictions
                 predictions = self.model(input_texts)
                 logger.info(f"{predictions=}")
 
