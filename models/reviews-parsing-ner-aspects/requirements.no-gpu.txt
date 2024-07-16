@@ -14,3 +14,7 @@ transformers==4.41.0
 # Manually add other packages
 mlserver==1.6.0
 loguru==0.7.2
+# OpenTelemetry
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-jaeger
