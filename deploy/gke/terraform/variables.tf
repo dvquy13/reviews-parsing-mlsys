@@ -55,7 +55,7 @@ variable "hp_node_pool_name" {
 variable "hp_node_machine_type" {
   description = "The machine type for the GKE high-perf node pool"
   type        = string
-  default     = "e2-standard-4"
+  default     = "e2-standard-2"
 }
 
 variable "disk_type" {

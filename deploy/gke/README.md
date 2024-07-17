@@ -1,24 +1,18 @@
+# Create cluster
+
+> - Run `export ENV=<ENV>` with the target <ENV>, for example: `export ENV=staging`
+> - `cd <ROOT>/deploy/gke/terraform`
+> - `terraform apply --var="env=$ENV"
+
 # Install apps in GKE Cluster
 
 > - `cd <ROOT>/deploy/gke`
-> - Run `export ENV=<ENV>` with the target <ENV>, for example: `export ENV=dev`
 
 ```
 # Init the env vars
 export $(cat ../../.env.$ENV | grep -v "^#")
-```
-
----
-
-# Set up VPA
-
-```
-kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=$GCLOUD_ACCOUNT
-
-git clone https://github.com/kubernetes/autoscaler.git
-cd autoscaler/vertical-pod-autoscaler && \
-  ./hack/vpa-up.sh && \
-  cd ../..
+gcloud container clusters get-credentials $APP_NAME --zone $GCP_ZONE --project $GCP_PROJECT_NAME
+kubectl config use-context gke_${GCP_PROJECT_NAME}_${GCP_ZONE}_${APP_NAME}
 ```
 
 ---
@@ -34,11 +28,11 @@ Ref:
 export IP_ADDRESS=$(gcloud compute addresses list | grep $ENV-$APP_NAME | awk '{print $2}') && echo $IP_ADDRESS
 
 ## Create Nginx Ingress Controller to listen to request from the static IP
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && \
-helm repo update && \
-helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx --set controller.service.loadBalancerIP=$IP_ADDRESS && \
-kubectl wait --for=condition=ready pod --all --timeout=300s && \
-  sed -i 's/target: ".*"/target: "'"$IP_ADDRESS"'"/g' openapi.$ENV.yaml
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx --set controller.service.loadBalancerIP=$IP_ADDRESS
+kubectl wait --for=condition=ready pod --all --timeout=300s
+sed -i 's/target: ".*"/target: "'"$IP_ADDRESS"'"/g' openapi.$ENV.yaml
 ```
 
 ```
@@ -49,19 +43,20 @@ gcloud endpoints services deploy openapi.$ENV.yaml
 ## Cert Manager to add TLS
 Ref: Install with Helm: https://cert-manager.io/docs/installation/helm/
 ```
-helm repo add jetstack https://charts.jetstack.io --force-update && \
-helm repo update && \
+helm repo add jetstack https://charts.jetstack.io --force-update
+helm repo update 
 helm install \
   cert-manager jetstack/cert-manager \
   --namespace cert-manager \
   --create-namespace \
   --version v1.15.0 \
-  --set crds.enabled=true && \
+  --set crds.enabled=true
 kubectl wait --namespace cert-manager --for=condition=ready --all pod --timeout=300s
 ```
 
 ## Install our custom Ingress
 ```
+kubectl create namespace monitoring
 helm upgrade --install \
   --set env=$ENV \
   --set gcpProjectName=$GCP_PROJECT_NAME \
@@ -75,12 +70,14 @@ helm upgrade --install \
 # Install MLflow
 ```
 # Install with Helm
-helm upgrade --install mlflow oci://registry-1.docker.io/bitnamicharts/mlflow -f ../services/mlflow/values.yaml && \
-  export MLFLOW_TRACKING_PASSWORD=$(kubectl get secret --namespace default mlflow-tracking -o jsonpath="{.data.admin-password }" | base64 -d) && \
-  sed -i "s/^MLFLOW_TRACKING_PASSWORD=.*/MLFLOW_TRACKING_PASSWORD=$MLFLOW_TRACKING_PASSWORD/" ../../.env.$ENV && \
-  echo "Try access MLflow UI at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/mlflow with $MLFLOW_TRACKING_USERNAME/$MLFLOW_TRACKING_PASSWORD"
+helm upgrade --install mlflow oci://registry-1.docker.io/bitnamicharts/mlflow -f ../services/mlflow/values.yaml
+export MLFLOW_TRACKING_PASSWORD=$(kubectl get secret --namespace default mlflow-tracking -o jsonpath="{.data.admin-password }" | base64 -d)
+sed -i "s/^MLFLOW_TRACKING_PASSWORD=.*/MLFLOW_TRACKING_PASSWORD=$MLFLOW_TRACKING_PASSWORD/" ../../.env.$ENV
+kubectl wait --selector='!job-name' --for=condition=ready --all po --timeout=300s 
+echo "Try access MLflow UI at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/mlflow with $MLFLOW_TRACKING_USERNAME/$MLFLOW_TRACKING_PASSWORD"
+# Disable VPA after finding that VPA update can make MLflow Tracking Server to stop working
 # Apply VPA
-kubectl apply -f ../services/mlflow/vpa.yaml
+# kubectl apply -f ../services/mlflow/vpa.yaml
 ```
 
 ---
@@ -118,32 +115,40 @@ kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1
 ## Install core components of Knative Serving
 ```
 kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.14.1/serving-core.yaml
+kubectl wait -n knative-serving --for=condition=ready --all po --timeout=300s
 ```
 
 ## Install Networking Layer with Istio
 ```
 kubectl apply -l knative.dev/crd-install=true -f https://github.com/knative/net-istio/releases/download/knative-v1.14.1/istio.yaml
-kubectl apply -f https://github.com/knative/net-istio/releases/download/knative-v1.14.1/istio.yaml
+# Do not apply the raw version of istio.yaml because of high resource request
+# kubectl apply -f https://github.com/knative/net-istio/releases/download/knative-v1.14.1/istio.yaml
+# Download the istio.yaml file and modify resource request
+kubectl apply -f ../services/istio/istio.yaml
 kubectl apply -f https://github.com/knative/net-istio/releases/download/knative-v1.14.1/net-istio.yaml
-export ISTIO_IP=$(kubectl --namespace istio-system get service istio-ingressgateway | awk 'NR>1 {print $4}') && \
-  sed -i "s/^ISTIO_IP=.*/ISTIO_IP=$ISTIO_IP/" ../../.env.$ENV
+kubectl wait -n istio-system --for=condition=ready --all po --timeout=300s
 kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.14.1/serving-default-domain.yaml
+kubectl wait -n knative-serving --selector='!job-name' --for=condition=ready --all po --timeout=300s
+export ISTIO_IP=$(kubectl --namespace istio-system get service istio-ingressgateway | awk 'NR>1 {print $4}')
+sed -i "s/^ISTIO_IP=.*/ISTIO_IP=$ISTIO_IP/" ../../.env.$ENV
+echo "ISTIO sslip.io available at: $ISTIO_IP.sslip.io"
 ```
 
-> [!WARNING]
+> [!NOTE]
+> New approach has already been implemented by downloading the istio.yaml file and modify the resource request there.
+> Below is old approach:
 > If you encounter unschedulable error with the Inference Service, consider update Istio Resource Request to free up allocable:
 > - `kubectl edit deploy istio-ingressgateway --namespace istio-system`, change request 1 CPU and 1Gi Memory to 200m CPU and 200Mi Memory
 > - `kubectl edit deploy istiod --namespace istio-system`, change request 500m CPU and 2Gi Memory to 200m CPU and 300Mi Memory
 > - Delete all the unscheduled/pending deployments
 > - TODO: Modify the installation instruction to download the manifest and modify the resources request there instead.
 
-> [!NOTE]
-> At this point the FQDN `$ISTIO_IP.sslip.io` should already be available
-
 ## Install KServe
 ```
 kubectl apply -f https://github.com/kserve/kserve/releases/download/v0.13.0/kserve.yaml
+kubectl wait -n kserve --selector='!job-name' --for=condition=ready --all po --timeout=300s
 kubectl apply -f https://github.com/kserve/kserve/releases/download/v0.13.0/kserve-cluster-resources.yaml
+kubectl wait -n kserve --selector='!job-name' --for=condition=ready --all po --timeout=300s
 ```
 
 ## Configure Knative cluster to deploy images from private registry
@@ -169,6 +174,9 @@ make push
 cd ../../deploy/gke
 ```
 
+> [!IMPORTANT]
+> Update the model image with tag at `../services/kserve/inference.yaml`
+
 ## Deploy the MLServer
 
 ### Create app-secret
@@ -182,13 +190,11 @@ kubectl create secret generic app-secret --from-env-file=../../.env.$ENV
 ### Deploy the inferenceservice
 ```
 kubectl apply -f ../services/kserve/inference.yaml --namespace default
-kubectl wait --for=condition=ready pod -l app=reviews-parsing-ner-aspects-mlserver-predictor-00001 --timeout=300s
-echo "Access the KServe docs at: http://reviews-parsing-ner-aspects-mlserver.default.$ISTIO_IP.sslip.io/v2/models/reviews-parsing-ner-aspects/docs"
+# Sleep to wait for the pod predictor to appear before we can wait for it
+sleep(5)
+kubectl wait --selector='!job-name' --for=condition=ready --all po --timeout=300s
+echo "Access the KServe Model Swagger docs at: http://reviews-parsing-ner-aspects-mlserver.default.$ISTIO_IP.sslip.io/v2/models/reviews-parsing-ner-aspects/docs"
 ```
-
-> [!TIP]
-> If successfully deploy, we can access `http://reviews-parsing-ner-aspects-mlserver.default.$ISTIO_IP.sslip.io/v2/models/reviews-parsing-ner-aspects/docs` using our browser
-> to check out the Model Swagger Doc.
 
 Test inference:
 ```
@@ -222,35 +228,69 @@ curl -X 'POST' \
 
 ## Prometheus and Grafana
 ```
+# Prometheus
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo add grafana https://grafana.github.io/helm-charts
 helm repo update
 helm upgrade --install prometheus prometheus-community/prometheus \
   --namespace monitoring --create-namespace
+kubectl wait -n monitoring --selector='!job-name' --for=condition=ready --all po --timeout=300s
 
+# Grafana
 helm upgrade --install grafana grafana/grafana \
   -f ../services/grafana/values.yaml \
   --set 'grafana\.ini'.server.root_url=https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/grafana \
   --namespace monitoring
 export GRAFANA_ADMIN_PASSWORD=$(kubectl get secret --namespace monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo)
 sed -i "s/^GRAFANA_ADMIN_PASSWORD=.*/GRAFANA_ADMIN_PASSWORD=$GRAFANA_ADMIN_PASSWORD/" ../../.env.$ENV
+kubectl wait -n monitoring --selector='!job-name' --for=condition=ready --all po --timeout=300s
+echo "Access Grafana at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/grafana with admin/$GRAFANA_ADMIN_PASSWORD"
 ```
 
-Connecting Grafana with Prometheus Data Source via this URL: `http://prometheus-server.monitoring.svc.cluster.local:80`
-
-Starter Grafana Dashboard:
-- K8s Resource Monitoring: id=`17375`
+> [!NOTE]
+> Connecting Grafana with Prometheus Data Source via this URL: `http://prometheus-server.monitoring.svc.cluster.local:80`
+> 
+> Starter Grafana Dashboard: K8s Resource Monitoring: id=`17375`
 
 ---
 
 # Delete all resources
+## Delete all resources but retaining cluster
 ```
 ./delete-installed.sh
+```
+## Delete cluster
+```
+cd terraform
+terraform destroy --var="env=$ENV"
+# Be careful that the below command would delete all compute disks regardless of them being related to the deleted GKE cluster or not
+for disk in $(gcloud compute disks list --format="value(name,zone)" | awk '{print $1}'); do
+  zone=$(gcloud compute disks list --filter="name:$disk" --format="value(zone)")
+  gcloud compute disks delete $disk --zone=$zone --quiet
+done
+cd ..
 ```
 
 ---
 
-# Edit VPA's Updater min-replicas from 2 to 1 so that updater can update resource requests based on recommendation
+# Set up VPA
+
+> [!CAUTION]
+> In this cluster setup we have observed situations where the VPA updates MLflow Tracking Server resource requests which caused it to stop working
+> Because of this, we disable the use of VPA for this cluster
+
+```
+kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=$GCLOUD_ACCOUNT
+
+git clone https://github.com/kubernetes/autoscaler.git
+cd autoscaler/vertical-pod-autoscaler && \
+  ./hack/vpa-up.sh && \
+  cd ../..
+```
+
+---
+
+## Edit VPA's Updater min-replicas from 2 to 1 so that updater can update resource requests based on recommendation
 
 > [!CAUTION]
 > Use this with caution. Should only use to test VPA function or when you know what you're doing.

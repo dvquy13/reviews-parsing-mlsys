@@ -79,11 +79,11 @@ resource "google_container_node_pool" "high_perf" {
   cluster    = google_container_cluster.primary.name
   location   = google_container_cluster.primary.location
   name       = var.hp_node_pool_name
-  node_count = 0
+  node_count = 1
 
   autoscaling {
     min_node_count = 0
-    max_node_count = 2
+    max_node_count = 3
   }
 
   management {
