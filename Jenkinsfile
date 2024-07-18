@@ -33,6 +33,21 @@ pipeline {
                 ]) {
                     script {
                         sh 'kubectl get namespaces'
+                    }
+                }
+            }
+        }
+        stage('Wait for User Input') {
+            steps {
+                input 'Proceed with deployment?'
+            }
+        }
+        stage('Deploy') {
+            steps {
+                withKubeCredentials([
+                    [credentialsId: 'rpmls-jenkins-robot-token', serverUrl: "${env.GKE_CLUSTER_API_SERVER_URL}"],
+                ]) {
+                    script {
                         sh '''
                             kubectl annotate \
                                 -n default \
