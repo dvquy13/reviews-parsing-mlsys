@@ -19,12 +19,22 @@ pipeline {
         }
     }
     stages {
-        stage('Print Credentials and Test kubectl') {
+        stage('Print Environment and Test kubectl') {
             steps {
-                withCredentials([string(credentialsId: 'rpmls-jenkins-robot-token', variable: 'TOKEN')]) {
+                container('kubectl') {
                     script {
+                        // Print the environment variables
+                        sh 'printenv'
+
+                        // Print the working directory
+                        sh 'pwd'
+
+                        // List files in the workspace
+                        sh 'ls -la'
+
                         // Verify kubectl is available
                         sh 'kubectl version --client'
+
                         // Check if ~/.kube/config file exists
                         sh '''
                         if [ -f ~/.kube/config ]; then
@@ -33,6 +43,7 @@ pipeline {
                             echo "~/.kube/config does not exist"
                         fi
                         '''
+
                         // Print the content of the KUBECONFIG environment variable
                         sh 'echo $KUBECONFIG'
                     }
@@ -41,6 +52,50 @@ pipeline {
         }
     }
 }
+
+// pipeline {
+//     agent {
+//         kubernetes {
+//             yaml '''
+//             apiVersion: v1
+//             kind: Pod
+//             spec:
+//               containers:
+//               - name: jnlp
+//                 image: jenkins/inbound-agent:latest
+//                 args: ['$(JENKINS_SECRET)', '$(JENKINS_NAME)']
+//               - name: kubectl
+//                 image: bitnami/kubectl:latest
+//                 command:
+//                 - cat
+//                 tty: true
+//             '''
+//             defaultContainer 'kubectl'
+//         }
+//     }
+//     stages {
+//         stage('Print Credentials and Test kubectl') {
+//             steps {
+//                 withCredentials([string(credentialsId: 'rpmls-jenkins-robot-token', variable: 'TOKEN')]) {
+//                     script {
+//                         // Verify kubectl is available
+//                         sh 'kubectl version --client'
+//                         // Check if ~/.kube/config file exists
+//                         sh '''
+//                         if [ -f ~/.kube/config ]; then
+//                             echo "~/.kube/config exists"
+//                         else
+//                             echo "~/.kube/config does not exist"
+//                         fi
+//                         '''
+//                         // Print the content of the KUBECONFIG environment variable
+//                         sh 'echo $KUBECONFIG'
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
 
 // pipeline {
 //     agent {
