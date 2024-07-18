@@ -14,6 +14,8 @@ pipeline {
                 command:
                 - cat
                 tty: true
+                # Below securityContext is to prevent Jenkins hangs infinitely at `sh` command
+                # Ref: https://stackoverflow.com/a/61012758
                 securityContext:
                   runAsUser: 0
             '''
@@ -25,8 +27,18 @@ pipeline {
             steps {
                 container('kubectl') {
                     script {
-                        sh 'printenv'
-                        sh 'kubectl version'
+                        sh 'echo $KUBECONFIG'
+                    }
+                }
+            }
+        }
+        stage('Test Kubernetes Connection') {
+            steps {
+                withKubeCredentials([
+                    [credentialsId: 'rpmls-jenkins-robot-token', serverUrl: 'https://34.126.107.187'],
+                ]) {
+                    script {
+                        sh 'kubectl get namespaces'
                     }
                 }
             }
