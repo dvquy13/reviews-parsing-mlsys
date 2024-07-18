@@ -67,8 +67,6 @@ helm upgrade --install \
   main-ingress \
   ./ingress \
   -f ingress/values.yaml
-export JENKINS_ADMIN_PASSWORD=$(kubectl exec --namespace cicd -it svc/jenkins -c jenkins -- /bin/cat /run/secrets/additional/chart-admin-password && echo)
-sed -i "s/^JENKINS_ADMIN_PASSWORD=.*/JENKINS_ADMIN_PASSWORD=$JENKINS_ADMIN_PASSWORD/" ../../.env.$ENV
 ```
 
 # Check if the output contains "SSL certificate verify ok"
@@ -137,6 +135,96 @@ helm install jenkins jenkins/jenkins --namespace cicd --create-namespace \
   --set controller.jenkinsUrl=https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/jenkins \
   --set controller.jenkinsUriPrefix=/jenkins
 kubectl wait -n cicd --for=condition=ready --all po --timeout=300s
+export JENKINS_ADMIN_PASSWORD=$(kubectl exec --namespace cicd -it svc/jenkins -c jenkins -- /bin/cat /run/secrets/additional/chart-admin-password && echo)
+sed -i "s/^JENKINS_ADMIN_PASSWORD=.*/JENKINS_ADMIN_PASSWORD=$JENKINS_ADMIN_PASSWORD/" ../../.env.$ENV
+echo "Try access Jenkins UI at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/jenkins with admin/$JENKINS_ADMIN_PASSWORD"
+```
+
+### Set up Jenkins
+
+> [!NOTE]
+> Below are instructions to set up Jenkins:
+
+Install the following Jenkins plugins:
+- Kubernetes CLI
+- Kubernetes Credentials Provider
+- Google Kubernetes Engine
+- Github
+- Pipeline
+
+Set up Github Webhooks:
+- Go to Github repo > Settings > Webhooks
+- Payload URL: https://dev-reviews-parsing-mlsys.endpoints.cold-embrace-240710.cloud.goog/jenkins/github-webhook/ (notice the trailing `/`)
+- Content type: application/json
+- Select individual events: Pull requests and Pushes
+
+Create Github Access Token
+- Create Personal access tokens (classic)
+- All permissions
+
+Set up Jenkins Pipeline:
+- Create new Multibranch Pipeline item in Jenkins
+- Add credentials, use the above token for password
+
+Go to Manage Jenkins > Settings > Github API usage > Choose Never check rate limit
+
+#### Connect Jenkins with GKE
+
+<!-- Attempt 3
+Ref: https://plugins.jenkins.io/kubernetes-cli/
+```
+kubectl -n cicd create serviceaccount jenkins-robot
+kubectl -n cicd create clusterrolebinding jenkins-robot-binding --clusterrole=cluster-admin --serviceaccount=cicd:jenkins-robot
+kubectl -n cicd get serviceaccount jenkins-robot -o go-template --template='{{range .secrets}}{{.name}}{{"\n"}}{{end}}'
+```
+-->
+
+Attempt 2
+```
+cd ../services/jenkins/k8s-auth/manual
+kubectl apply -f jenkins-service-account.yaml
+kubectl apply -f jenkins-clusterrolebinding.yaml
+kubectl apply -f jenkins-token-secret.yaml
+export JENKINS_ROBOT_TOKEN=$(kubectl get secret jenkins-robot-token -o jsonpath='{.data.token}' | base64 --decode) && echo $JENKINS_ROBOT_TOKEN
+```
+
+> [!NOTE]
+> Add the values of `JENKINS_ROBOT_TOKEN` variable to Jenkins Credentials > Secret text with id credential ID: `rpmls-jenkins-robot-token`
+
+
+<!-- Attempt 1
+Ref: https://github.com/jenkinsci/google-kubernetes-engine-plugin/blob/develop/docs/Home.md
+
+Follow until the end of "Configure target GKE cluster"
+
+```
+cd ../services/jenkins/k8s-auth
+git clone https://github.com/jenkinsci/google-kubernetes-engine-plugin.git
+cd google-kubernetes-engine-plugin/docs
+```
+
+Follow the instructions at https://github.com/jenkinsci/google-kubernetes-engine-plugin/blob/develop/docs/Home.md#automated-permissions-configuration
+
+GCP IAM Permissions
+```
+pushd rbac
+export TF_VAR_PROJECT=${GCP_PROJECT_NAME}
+export TF_VAR_REGION=${GCP_REGION}
+export TF_VAR_SA_NAME=${JENKINS_GCP_SERVICE_ACCOUNT}
+terraform init
+terraform plan -out /tmp/tf.plan
+terraform apply /tmp/tf.plan
+rm /tmp/tf.plan
+```
+If error from `gcp-sa-setup.tf` requiring removing double quotes from "string", do it and run again.
+
+GKE Cluster RBAC Permissions
+```
+popd
+pushd helm
+export TARGET_NAMESPACE=cicd
+export SA_EMAIL=$JENKINS_GCP_SERVICE_ACCOUNT_EMAIL
+envsubst < gke-robot-deployer/values.yaml | helm install gke-robot-deployer ./gke-robot-deployer -f - -->
 ```
 
 ---

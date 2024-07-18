@@ -2,6 +2,8 @@ apiVersion: "serving.kserve.io/v1beta1"
 kind: "InferenceService"
 metadata:
   name: "reviews-parsing-ner-aspects-mlserver"
+  annotations:
+    deploy_timestamp: ""
 spec:
   predictor:
     imagePullSecrets:
