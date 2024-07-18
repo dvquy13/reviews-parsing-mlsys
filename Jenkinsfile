@@ -23,7 +23,8 @@ pipeline {
             steps {
                 container('kubectl') {
                     script {
-                        printenv
+                        sh 'printenv'
+                        sh 'kubectl version'
                     }
                 }
             }
