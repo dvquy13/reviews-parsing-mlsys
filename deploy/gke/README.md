@@ -161,7 +161,7 @@ Create Github Access Token
 
 Set up Jenkins Pipeline:
 - Create new Multibranch Pipeline item in Jenkins
-- Add a new Filter by name: `^main$`
+- If want to trigger build only on certain branches, add a new "Filter by name: `^main$`", else select "All branches"
 - Add credentials, use the above token for password
 
 Go to Manage Jenkins > Settings > Github API usage > Choose Never check rate limit
