@@ -1,12 +1,32 @@
 pipeline {
-    agent any
+    agent {
+        kubernetes {
+            yaml '''
+            apiVersion: v1
+            kind: Pod
+            spec:
+              containers:
+              - name: jnlp
+                image: jenkins/inbound-agent:latest
+                args: ['$(JENKINS_SECRET)', '$(JENKINS_NAME)']
+              - name: kubectl
+                image: bitnami/kubectl:latest
+                command:
+                - cat
+                tty: true
+            '''
+            defaultContainer 'kubectl'
+        }
+    }
     stages {
-        stage('Print Credentials') {
+        stage('Print Credentials and Test kubectl') {
             steps {
                 withCredentials([string(credentialsId: 'rpmls-jenkins-robot-token', variable: 'TOKEN')]) {
                     script {
-                        // Print the content of the credentials
-                        echo "The content of the credential is: ${TOKEN}"
+                        echo "KUBECONFIG: ${KUBECONFIG}"
+                        // Verify kubectl is available
+                        sh 'kubectl version --client'
+                        ls ~/.kube
                     }
                 }
             }
