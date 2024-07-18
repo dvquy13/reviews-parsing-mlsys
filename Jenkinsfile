@@ -12,8 +12,10 @@ pipeline {
               - name: kubectl
                 image: bitnami/kubectl:latest
                 command:
-                - /bin/sh
+                - cat
                 tty: true
+                securityContext:
+                  runAsUser: 0
             '''
             defaultContainer 'kubectl'
         }
