@@ -33,6 +33,13 @@ pipeline {
                 ]) {
                     script {
                         sh 'kubectl get namespaces'
+                        sh '''
+                            kubectl annotate \
+                                -n default \
+                                inferenceservice reviews-parsing-ner-aspects-mlserver \
+                                deploy_timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+                                --overwrite
+                        '''
                     }
                 }
             }

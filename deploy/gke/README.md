@@ -170,16 +170,6 @@ Go to Manage Jenkins > Settings > Github API usage > Choose Never check rate lim
 
 #### Connect Jenkins with GKE
 
-<!-- Attempt 3
-Ref: https://plugins.jenkins.io/kubernetes-cli/
-```
-kubectl -n cicd create serviceaccount jenkins-robot
-kubectl -n cicd create clusterrolebinding jenkins-robot-binding --clusterrole=cluster-admin --serviceaccount=cicd:jenkins-robot
-kubectl -n cicd get serviceaccount jenkins-robot -o go-template --template='{{range .secrets}}{{.name}}{{"\n"}}{{end}}'
-```
--->
-
-Attempt 2
 ```
 cd ../services/jenkins/k8s-auth/manual
 kubectl apply -f jenkins-service-account.yaml
@@ -192,41 +182,6 @@ export CLUSTER_API_SERVER_URL=$(kubectl cluster-info | grep "Kubernetes control 
 > [!NOTE]
 > - Add the value of `JENKINS_ROBOT_TOKEN` variable to Jenkins Credentials > Secret text with id credential ID: `rpmls-jenkins-robot-token`
 > - Add the value of `CLUSTER_API_SERVER_URL` variable to Jenkins Credentials > Secret text with id credential ID: `gke-cluster-api-server-url`
-
-<!-- Attempt 1
-Ref: https://github.com/jenkinsci/google-kubernetes-engine-plugin/blob/develop/docs/Home.md
-
-Follow until the end of "Configure target GKE cluster"
-
-```
-cd ../services/jenkins/k8s-auth
-git clone https://github.com/jenkinsci/google-kubernetes-engine-plugin.git
-cd google-kubernetes-engine-plugin/docs
-```
-
-Follow the instructions at https://github.com/jenkinsci/google-kubernetes-engine-plugin/blob/develop/docs/Home.md#automated-permissions-configuration
-
-GCP IAM Permissions
-```
-pushd rbac
-export TF_VAR_PROJECT=${GCP_PROJECT_NAME}
-export TF_VAR_REGION=${GCP_REGION}
-export TF_VAR_SA_NAME=${JENKINS_GCP_SERVICE_ACCOUNT}
-terraform init
-terraform plan -out /tmp/tf.plan
-terraform apply /tmp/tf.plan
-rm /tmp/tf.plan
-```
-If error from `gcp-sa-setup.tf` requiring removing double quotes from "string", do it and run again.
-
-GKE Cluster RBAC Permissions
-```
-popd
-pushd helm
-export TARGET_NAMESPACE=cicd
-export SA_EMAIL=$JENKINS_GCP_SERVICE_ACCOUNT_EMAIL
-envsubst < gke-robot-deployer/values.yaml | helm install gke-robot-deployer ./gke-robot-deployer -f - -->
-```
 
 ---
 
