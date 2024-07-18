@@ -137,6 +137,13 @@ helm upgrade --install jaeger oci://registry-1.docker.io/bitnamicharts/jaeger -n
 kubectl wait -n monitoring --selector='!job-name' --for=condition=ready --all po --timeout=300s
 ```
 
+> [!NOTE]
+> You can connect Grafana to Jaeger by using the URL: `http://jaeger-query.monitoring.svc.cluster.local:16686/jaeger`
+>
+> Notice the endpoint `/jaeger` added to the end of the URL
+> 
+> Ref: https://stackoverflow.com/a/72904828
+
 > [!WARNING]
 > When deleting Jaeger with `helm delete`, make sure you delete the PVC `data-jaeger-cassandra-0` as well otherwise when restarting we might run into password incorrect error.
 
@@ -178,7 +185,16 @@ kubectl apply -f https://github.com/knative/net-istio/releases/download/knative-
 kubectl wait -n istio-system --for=condition=ready --all po --timeout=300s
 kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.14.1/serving-default-domain.yaml
 kubectl wait -n knative-serving --selector='!job-name' --for=condition=ready --all po --timeout=300s
-export ISTIO_IP=$(kubectl --namespace istio-system get service istio-ingressgateway | awk 'NR>1 {print $4}')
+while true; do
+  export ISTIO_IP=$(kubectl --namespace istio-system get service istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+  if [ -n "$ISTIO_IP" ]; then
+    echo "Istio IP is ready: $ISTIO_IP"
+    break
+  else
+    echo "Istio IP is not ready yet. Waiting..."
+    sleep 10
+  fi
+done
 sed -i "s/^ISTIO_IP=.*/ISTIO_IP=$ISTIO_IP/" ../../.env.$ENV
 echo "ISTIO sslip.io available at: $ISTIO_IP.sslip.io"
 ```
@@ -239,8 +255,7 @@ kubectl create secret generic app-secret --from-env-file=../../.env.$ENV
 ### Deploy the inferenceservice
 ```
 kubectl apply -f ../services/kserve/inference.yaml --namespace default
-# Sleep to wait for the pod predictor to appear before we can wait for it
-sleep(5)
+kubectl wait --for=condition=ready --all revision --timeout=300s
 kubectl wait --selector='!job-name' --for=condition=ready --all po --timeout=300s
 echo "Access the KServe Model Swagger docs at: http://reviews-parsing-ner-aspects-mlserver.default.$ISTIO_IP.sslip.io/v2/models/reviews-parsing-ner-aspects/docs"
 ```

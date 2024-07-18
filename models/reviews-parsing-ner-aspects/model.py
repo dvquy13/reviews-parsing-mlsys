@@ -1,3 +1,4 @@
+import os
 import json
 from loguru import logger
 from mlserver import MLModel, types
@@ -14,11 +15,10 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 # Service name is required for most backends
 resource = Resource(attributes={SERVICE_NAME: "rpna-mlserver"})
+jaeger_url = os.environ.get("JAEGER_URL")
 
 traceProvider = TracerProvider(resource=resource)
-processor = BatchSpanProcessor(
-    OTLPSpanExporter(endpoint="http://jaeger:4318/v1/traces")
-)
+processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=f"{jaeger_url}/v1/traces"))
 traceProvider.add_span_processor(processor)
 trace.set_tracer_provider(traceProvider)
 tracer = trace.get_tracer(__name__)

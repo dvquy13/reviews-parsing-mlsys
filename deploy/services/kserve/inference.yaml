@@ -8,7 +8,7 @@ spec:
     - name: reviews-parsing-ner-aspects-container-registry
     containers:
       - name: "mlserver"
-        image: "dvquy13/reviews-parsing-ner-aspects:0.1.2"
+        image: "dvquy13/reviews-parsing-ner-aspects:0.1.3"
         ports:
           - containerPort: 8080
             protocol: TCP
@@ -30,6 +30,8 @@ spec:
               secretKeyRef:
                 name: app-secret
                 key: MLFLOW_TRACKING_PASSWORD
+          - name: JAEGER_URL
+            value: "http://jaeger-collector.monitoring.svc.cluster.local:4318"
         resources:
           requests:
             # Original:
