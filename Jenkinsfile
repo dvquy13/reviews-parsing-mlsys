@@ -1,20 +1,20 @@
 pipeline {
     agent {
         kubernetes {
-            yaml """
+            yaml '''
             apiVersion: v1
             kind: Pod
             spec:
               containers:
               - name: jnlp
-                image: jenkins/inbound-agent
-                args: ['$(JENKINS_SECRET)', '$(JENKINS_NAME)']
+                image: jenkins/inbound-agent:latest
+                args: ['\$(JENKINS_SECRET)', '\$(JENKINS_NAME)']
               - name: kubectl
-                image: bitnami/kubectl
+                image: bitnami/kubectl:latest
                 command:
                 - cat
                 tty: true
-            """
+            '''
             defaultContainer 'kubectl'
             credentialsId 'rpmls-jenkins-robot-token'
         }
