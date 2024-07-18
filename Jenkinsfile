@@ -12,7 +12,7 @@ pipeline {
               - name: kubectl
                 image: bitnami/kubectl:latest
                 command:
-                - cat
+                - /bin/sh
                 tty: true
             '''
             defaultContainer 'kubectl'
@@ -23,29 +23,7 @@ pipeline {
             steps {
                 container('kubectl') {
                     script {
-                        // Print the environment variables
-                        sh 'printenv'
-
-                        // Print the working directory
-                        sh 'pwd'
-
-                        // List files in the workspace
-                        sh 'ls -la'
-
-                        // Verify kubectl is available
-                        sh 'kubectl version --client'
-
-                        // Check if ~/.kube/config file exists
-                        sh '''
-                        if [ -f ~/.kube/config ]; then
-                            echo "~/.kube/config exists"
-                        else
-                            echo "~/.kube/config does not exist"
-                        fi
-                        '''
-
-                        // Print the content of the KUBECONFIG environment variable
-                        sh 'echo $KUBECONFIG'
+                        printenv
                     }
                 }
             }
