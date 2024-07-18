@@ -13,3 +13,4 @@ letsencryptIssuer: letsencrypt-prod
 namespaces:
   - default
   - monitoring
+  - cicd

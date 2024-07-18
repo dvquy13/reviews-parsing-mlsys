@@ -58,7 +58,9 @@ gcloud endpoints services deploy openapi.$ENV.yaml
 ## Install our custom Ingress
 ```
 kubectl create namespace monitoring
+kubectl create namespace cicd
 helm upgrade --install \
+  -n default \
   --set env=$ENV \
   --set gcpProjectName=$GCP_PROJECT_NAME \
   --set emailForCertIssuer=$USER_EMAIL \
@@ -74,32 +76,6 @@ if echo "$ssl_check" | grep -q "SSL certificate verify ok"; then
 else
     echo "The TLS certificate for $URL is not valid or could not be verified."
 fi
-
----
-
-# Install MLflow
-```
-# Install with Helm
-helm upgrade --install mlflow oci://registry-1.docker.io/bitnamicharts/mlflow -f ../services/mlflow/values.yaml
-export MLFLOW_TRACKING_PASSWORD=$(kubectl get secret --namespace default mlflow-tracking -o jsonpath="{.data.admin-password }" | base64 -d)
-sed -i "s/^MLFLOW_TRACKING_PASSWORD=.*/MLFLOW_TRACKING_PASSWORD=$MLFLOW_TRACKING_PASSWORD/" ../../.env.$ENV
-kubectl wait --selector='!job-name' --for=condition=ready --all po --timeout=300s 
-echo "Try access MLflow UI at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/mlflow with $MLFLOW_TRACKING_USERNAME/$MLFLOW_TRACKING_PASSWORD"
-# Disable VPA after finding that VPA update can make MLflow Tracking Server to stop working
-# Apply VPA
-# kubectl apply -f ../services/mlflow/vpa.yaml
-```
-
----
-
-# Model training
-
-The next section works by assuming that we already have a trained model named `reviews-parsing-ner-aspects@champion`.
-
-> [!NOTE]
-> To create this model: 
-> - Run the notebooks/train.ipynb notebook
-> - Register and create the alias `champion` for the trained model on MLflow
 
 ---
 
@@ -146,6 +122,90 @@ kubectl wait -n monitoring --selector='!job-name' --for=condition=ready --all po
 
 > [!WARNING]
 > When deleting Jaeger with `helm delete`, make sure you delete the PVC `data-jaeger-cassandra-0` as well otherwise when restarting we might run into password incorrect error.
+
+---
+
+# CI/CD
+
+## Jenkins
+```
+helm repo add jenkins https://charts.jenkins.io
+helm repo update
+helm install jenkins jenkins/jenkins --namespace cicd --create-namespace \
+  --set controller.jenkinsUrl=https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/jenkins \
+  --set controller.jenkinsUriPrefix=/jenkins
+kubectl wait -n cicd --for=condition=ready --all po --timeout=300s
+export JENKINS_ADMIN_PASSWORD=$(kubectl exec --namespace cicd -it svc/jenkins -c jenkins -- /bin/cat /run/secrets/additional/chart-admin-password && echo)
+sed -i "s/^JENKINS_ADMIN_PASSWORD=.*/JENKINS_ADMIN_PASSWORD=$JENKINS_ADMIN_PASSWORD/" ../../.env.$ENV
+echo "Try access Jenkins UI at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/jenkins with admin/$JENKINS_ADMIN_PASSWORD"
+```
+
+### Set up Jenkins
+
+> [!NOTE]
+> Below are instructions to set up Jenkins:
+
+Install the following Jenkins plugins:
+- Kubernetes CLI
+- Github
+
+Set up Github Webhooks:
+- Go to Github repo > Settings > Webhooks
+- Payload URL: https://dev-reviews-parsing-mlsys.endpoints.cold-embrace-240710.cloud.goog/jenkins/github-webhook/ (notice the trailing `/`)
+- Content type: application/json
+- Select individual events: Pull requests and Pushes
+
+Create Github Access Token
+- Create Personal access tokens (classic)
+- All permissions
+
+Set up Jenkins Pipeline:
+- Create new Multibranch Pipeline item in Jenkins
+- Add a new Filter by name: `^main$`
+- Add credentials, use the above token for password
+
+Go to Manage Jenkins > Settings > Github API usage > Choose Never check rate limit
+
+#### Connect Jenkins with GKE
+
+```
+cd ../services/jenkins/k8s-auth/manual
+kubectl apply -f jenkins-service-account.yaml
+kubectl apply -f jenkins-clusterrolebinding.yaml
+kubectl apply -f jenkins-token-secret.yaml
+export JENKINS_ROBOT_TOKEN=$(kubectl get secret jenkins-robot-token -o jsonpath='{.data.token}' | base64 --decode) && echo "JENKINS_ROBOT_TOKEN: $JENKINS_ROBOT_TOKEN"
+export CLUSTER_API_SERVER_URL=$(kubectl cluster-info | grep "Kubernetes control plane" | grep -oP 'https?://\S+') && echo "CLUSTER_API_SERVER_URL: $CLUSTER_API_SERVER_URL"
+```
+
+> [!NOTE]
+> - Add the value of `JENKINS_ROBOT_TOKEN` variable to Jenkins Credentials > Secret text with id credential ID: `rpmls-jenkins-robot-token`
+> - Add the value of `CLUSTER_API_SERVER_URL` variable to Jenkins Credentials > Secret text with id credential ID: `gke-cluster-api-server-url`
+
+---
+
+# MLflow
+```
+# Install with Helm
+helm upgrade --install mlflow oci://registry-1.docker.io/bitnamicharts/mlflow -f ../services/mlflow/values.yaml
+export MLFLOW_TRACKING_PASSWORD=$(kubectl get secret --namespace default mlflow-tracking -o jsonpath="{.data.admin-password }" | base64 -d)
+sed -i "s/^MLFLOW_TRACKING_PASSWORD=.*/MLFLOW_TRACKING_PASSWORD=$MLFLOW_TRACKING_PASSWORD/" ../../.env.$ENV
+kubectl wait --selector='!job-name' --for=condition=ready --all po --timeout=300s 
+echo "Try access MLflow UI at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/mlflow with $MLFLOW_TRACKING_USERNAME/$MLFLOW_TRACKING_PASSWORD"
+# Disable VPA after finding that VPA update can make MLflow Tracking Server to stop working
+# Apply VPA
+# kubectl apply -f ../services/mlflow/vpa.yaml
+```
+
+---
+
+# Model training
+
+The next section works by assuming that we already have a trained model named `reviews-parsing-ner-aspects@champion`.
+
+> [!NOTE]
+> To create this model: 
+> - Run the notebooks/train.ipynb notebook
+> - Register and create the alias `champion` for the trained model on MLflow
 
 ---
 

@@ -22,3 +22,14 @@ poetry install
 
 # Set up GKE
 GKE installation is located at `deploy/gke`
+
+# Deploy new KServe model
+## Alias the champion model with new version
+```
+poetry run python scripts/alias_new_mlflow_model_as_champion.py --run_id=<RUN_ID> --model_name=reviews-parsing-ner-aspects
+```
+
+## Reload the KServe Inference Service
+```
+kubectl annotate -n default inferenceservice reviews-parsing-ner-aspects-mlserver deploy_timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ') --overwrite
+```
