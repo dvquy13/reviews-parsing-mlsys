@@ -23,7 +23,6 @@ pipeline {
             steps {
                 withCredentials([string(credentialsId: 'rpmls-jenkins-robot-token', variable: 'TOKEN')]) {
                     script {
-                        echo "KUBECONFIG: ${KUBECONFIG}"
                         // Verify kubectl is available
                         sh 'kubectl version --client'
                         // Check if ~/.kube/config file exists
@@ -34,6 +33,8 @@ pipeline {
                             echo "~/.kube/config does not exist"
                         fi
                         '''
+                        // Print the content of the KUBECONFIG environment variable
+                        sh 'echo $KUBECONFIG'
                     }
                 }
             }
