@@ -8,7 +8,7 @@ pipeline {
               containers:
               - name: jnlp
                 image: jenkins/inbound-agent:latest
-                args: ['\$(JENKINS_SECRET)', '\$(JENKINS_NAME)']
+                args: ['$(JENKINS_SECRET)', '$(JENKINS_NAME)']
               - name: kubectl
                 image: bitnami/kubectl:latest
                 command:
@@ -16,18 +16,16 @@ pipeline {
                 tty: true
             '''
             defaultContainer 'kubectl'
-            credentialsId 'rpmls-jenkins-robot-token'
         }
-    }
-    environment {
-        KUBECONFIG = credentials('rpmls-jenkins-robot-token')
     }
     stages {
         stage('Test Kubernetes Connection') {
             steps {
-                script {
-                    // List Kubernetes namespaces
-                    sh 'kubectl get namespaces'
+                withCredentials([string(credentialsId: 'rpmls-jenkins-robot-token', variable: 'KUBECONFIG')]) {
+                    script {
+                        // List Kubernetes namespaces
+                        sh 'kubectl get namespaces'
+                    }
                 }
             }
         }
