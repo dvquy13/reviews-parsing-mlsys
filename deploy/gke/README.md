@@ -185,7 +185,8 @@ cd ../services/jenkins/k8s-auth/manual
 kubectl apply -f jenkins-service-account.yaml
 kubectl apply -f jenkins-clusterrolebinding.yaml
 kubectl apply -f jenkins-token-secret.yaml
-export JENKINS_ROBOT_TOKEN=$(kubectl get secret jenkins-robot-token -o jsonpath='{.data.token}' | base64 --decode) && echo $JENKINS_ROBOT_TOKEN
+export JENKINS_ROBOT_TOKEN=$(kubectl get secret jenkins-robot-token -o jsonpath='{.data.token}' | base64 --decode) && echo "JENKINS_ROBOT_TOKEN: $JENKINS_ROBOT_TOKEN"
+export CLUSTER_API_SERVER_URL=$(kubectl cluster-info | grep "Kubernetes control plane" | grep -oP 'https?://\S+') && echo "CLUSTER_API_SERVER_URL: $CLUSTER_API_SERVER_URL"
 ```
 
 > [!NOTE]

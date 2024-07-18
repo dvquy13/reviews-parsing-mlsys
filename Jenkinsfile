@@ -21,9 +21,10 @@ pipeline {
     stages {
         stage('Test Kubernetes Connection') {
             steps {
-                withCredentials([string(credentialsId: 'rpmls-jenkins-robot-token', variable: 'KUBECONFIG')]) {
+                withKubeCredentials([
+                    [credentialsId: 'rpmls-jenkins-robot-token', serverUrl: 'https://34.126.107.187'],
+                ]) {
                     script {
-                        // List Kubernetes namespaces
                         sh 'kubectl get namespaces'
                     }
                 }
