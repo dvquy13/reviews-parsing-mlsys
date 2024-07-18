@@ -18,6 +18,9 @@ pipeline {
             defaultContainer 'kubectl'
         }
     }
+    // environment {
+    //     KUBECONFIG = credentials('rpmls-jenkins-robot-token')
+    // }
     stages {
         stage('Test Kubernetes Connection') {
             steps {
@@ -25,7 +28,8 @@ pipeline {
                     [credentialsId: 'rpmls-jenkins-robot-token', serverUrl: 'https://34.126.107.187'],
                 ]) {
                     script {
-                        sh 'kubectl get namespaces'
+                        sh 'echo $KUBECONFIG'
+                        // sh 'kubectl get namespaces'
                     }
                 }
             }
