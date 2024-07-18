@@ -147,10 +147,7 @@ echo "Try access Jenkins UI at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NA
 
 Install the following Jenkins plugins:
 - Kubernetes CLI
-- Kubernetes Credentials Provider
-- Google Kubernetes Engine
 - Github
-- Pipeline
 
 Set up Github Webhooks:
 - Go to Github repo > Settings > Webhooks
@@ -164,6 +161,7 @@ Create Github Access Token
 
 Set up Jenkins Pipeline:
 - Create new Multibranch Pipeline item in Jenkins
+- Add a new Filter by name: `^main$`
 - Add credentials, use the above token for password
 
 Go to Manage Jenkins > Settings > Github API usage > Choose Never check rate limit
