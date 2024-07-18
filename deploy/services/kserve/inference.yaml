@@ -9,6 +9,7 @@ spec:
     containers:
       - name: "mlserver"
         image: "dvquy13/reviews-parsing-ner-aspects:0.1.3"
+        imagePullPolicy: "Always"
         ports:
           - containerPort: 8080
             protocol: TCP

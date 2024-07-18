@@ -24,7 +24,7 @@ Ref: Install with Helm: https://cert-manager.io/docs/installation/helm/
 ```
 helm repo add jetstack https://charts.jetstack.io --force-update
 helm repo update 
-helm install \
+helm upgrade --install \
   cert-manager jetstack/cert-manager \
   --namespace cert-manager \
   --create-namespace \
@@ -255,7 +255,8 @@ kubectl create secret generic app-secret --from-env-file=../../.env.$ENV
 ### Deploy the inferenceservice
 ```
 kubectl apply -f ../services/kserve/inference.yaml --namespace default
-kubectl wait --for=condition=ready --all revision --timeout=300s
+latest_revision=$(kubectl get revisions -l serving.knative.dev/service=reviews-parsing-ner-aspects-mlserver-predictor -o jsonpath='{.items[-1:].metadata.name}')
+kubectl wait --for=condition=ready revision $latest_revision --timeout=300s
 kubectl wait --selector='!job-name' --for=condition=ready --all po --timeout=300s
 echo "Access the KServe Model Swagger docs at: http://reviews-parsing-ner-aspects-mlserver.default.$ISTIO_IP.sslip.io/v2/models/reviews-parsing-ner-aspects/docs"
 ```

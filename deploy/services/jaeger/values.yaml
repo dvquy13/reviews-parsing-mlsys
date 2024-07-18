@@ -3,6 +3,12 @@ query:
   extraEnvVars:
     - name: QUERY_BASE_PATH
       value: /jaeger
+    - name: METRICS_STORAGE_TYPE
+      value: prometheus
+    - name: PROMETHEUS_SERVER_URL
+      value: http://prometheus-server.monitoring.svc.cluster.local:80
+    # - name: LOG_LEVEL
+    #   value: debug
 
 collector:
   resourcesPreset: nano
