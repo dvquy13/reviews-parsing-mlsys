@@ -190,8 +190,8 @@ export CLUSTER_API_SERVER_URL=$(kubectl cluster-info | grep "Kubernetes control 
 ```
 
 > [!NOTE]
-> Add the values of `JENKINS_ROBOT_TOKEN` variable to Jenkins Credentials > Secret text with id credential ID: `rpmls-jenkins-robot-token`
-
+> - Add the value of `JENKINS_ROBOT_TOKEN` variable to Jenkins Credentials > Secret text with id credential ID: `rpmls-jenkins-robot-token`
+> - Add the value of `CLUSTER_API_SERVER_URL` variable to Jenkins Credentials > Secret text with id credential ID: `gke-cluster-api-server-url`
 
 <!-- Attempt 1
 Ref: https://github.com/jenkinsci/google-kubernetes-engine-plugin/blob/develop/docs/Home.md
