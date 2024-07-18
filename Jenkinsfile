@@ -26,7 +26,14 @@ pipeline {
                         echo "KUBECONFIG: ${KUBECONFIG}"
                         // Verify kubectl is available
                         sh 'kubectl version --client'
-                        ls ~/.kube
+                        // Check if ~/.kube/config file exists
+                        sh '''
+                        if [ -f ~/.kube/config ]; then
+                            echo "~/.kube/config exists"
+                        else
+                            echo "~/.kube/config does not exist"
+                        fi
+                        '''
                     }
                 }
             }
