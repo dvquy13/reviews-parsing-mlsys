@@ -43,7 +43,9 @@ variable "default_node_pool_name" {
 variable "default_node_machine_type" {
   description = "The machine type for the GKE default node pool"
   type        = string
-  default     = "e2-medium"
+  default     = "e2-standard-2"
+  # Use e2-standard-2 here to maximize free trial quota (since e2-medium only request 50% of 2 vCPUS if I'm correct)
+  # default     = "e2-medium"
 }
 
 variable "hp_node_pool_name" {

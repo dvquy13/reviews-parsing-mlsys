@@ -19,6 +19,21 @@ kubectl config use-context gke_${GCP_PROJECT_NAME}_${GCP_ZONE}_${APP_NAME}
 
 # Set up Traffic Exposure via Ingress NGINX
 
+## Cert Manager to add TLS
+Ref: Install with Helm: https://cert-manager.io/docs/installation/helm/
+```
+helm repo add jetstack https://charts.jetstack.io --force-update
+helm repo update 
+helm install \
+  cert-manager jetstack/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --version v1.15.0 \
+  --set crds.enabled=true
+kubectl wait --namespace cert-manager --for=condition=ready --all pod --timeout=300s
+```
+
+## Install NGINX controller
 Ref:
 - https://cert-manager.io/docs/tutorials/acme/nginx-ingress/
 - https://kk-shichao.medium.com/expose-service-using-nginx-ingress-in-kind-cluster-from-wsl2-14492e153e99
@@ -40,30 +55,25 @@ sed -i 's/target: ".*"/target: "'"$IP_ADDRESS"'"/g' openapi.$ENV.yaml
 gcloud endpoints services deploy openapi.$ENV.yaml
 ```
 
-## Cert Manager to add TLS
-Ref: Install with Helm: https://cert-manager.io/docs/installation/helm/
-```
-helm repo add jetstack https://charts.jetstack.io --force-update
-helm repo update 
-helm install \
-  cert-manager jetstack/cert-manager \
-  --namespace cert-manager \
-  --create-namespace \
-  --version v1.15.0 \
-  --set crds.enabled=true
-kubectl wait --namespace cert-manager --for=condition=ready --all pod --timeout=300s
-```
-
 ## Install our custom Ingress
 ```
 kubectl create namespace monitoring
 helm upgrade --install \
   --set env=$ENV \
   --set gcpProjectName=$GCP_PROJECT_NAME \
+  --set emailForCertIssuer=$USER_EMAIL \
   main-ingress \
   ./ingress \
   -f ingress/values.yaml
 ```
+
+# Check if the output contains "SSL certificate verify ok"
+ssl_check=$(curl -s -I -v --stderr - "$URL" 2>&1)
+if echo "$ssl_check" | grep -q "SSL certificate verify ok"; then
+    echo "The TLS certificate for $URL is valid."
+else
+    echo "The TLS certificate for $URL is not valid or could not be verified."
+fi
 
 ---
 
@@ -90,6 +100,45 @@ The next section works by assuming that we already have a trained model named `r
 > To create this model: 
 > - Run the notebooks/train.ipynb notebook
 > - Register and create the alias `champion` for the trained model on MLflow
+
+---
+
+# Observability
+
+## Prometheus and Grafana
+```
+# Prometheus
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+helm upgrade --install prometheus prometheus-community/prometheus \
+  --namespace monitoring --create-namespace
+kubectl wait -n monitoring --selector='!job-name' --for=condition=ready --all po --timeout=300s
+
+# Grafana
+helm upgrade --install grafana grafana/grafana \
+  -f ../services/grafana/values.yaml \
+  --set 'grafana\.ini'.server.root_url=https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/grafana \
+  --namespace monitoring
+export GRAFANA_ADMIN_PASSWORD=$(kubectl get secret --namespace monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo)
+sed -i "s/^GRAFANA_ADMIN_PASSWORD=.*/GRAFANA_ADMIN_PASSWORD=$GRAFANA_ADMIN_PASSWORD/" ../../.env.$ENV
+kubectl wait -n monitoring --selector='!job-name' --for=condition=ready --all po --timeout=300s
+echo "Access Grafana at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/grafana with admin/$GRAFANA_ADMIN_PASSWORD"
+```
+
+> [!NOTE]
+> Connecting Grafana with Prometheus Data Source via this URL: `http://prometheus-server.monitoring.svc.cluster.local:80`
+> 
+> Starter Grafana Dashboard: K8s Resource Monitoring: id=`17375` and id=`315`
+
+## Jaeger
+```
+helm upgrade --install jaeger oci://registry-1.docker.io/bitnamicharts/jaeger -n monitoring -f ../services/jaeger/values.yaml
+kubectl wait -n monitoring --selector='!job-name' --for=condition=ready --all po --timeout=300s
+```
+
+> [!WARNING]
+> When deleting Jaeger with `helm delete`, make sure you delete the PVC `data-jaeger-cassandra-0` as well otherwise when restarting we might run into password incorrect error.
 
 ---
 
@@ -221,36 +270,6 @@ curl -X 'POST' \
   ]
 }'
 ```
-
----
-
-# Observability
-
-## Prometheus and Grafana
-```
-# Prometheus
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo add grafana https://grafana.github.io/helm-charts
-helm repo update
-helm upgrade --install prometheus prometheus-community/prometheus \
-  --namespace monitoring --create-namespace
-kubectl wait -n monitoring --selector='!job-name' --for=condition=ready --all po --timeout=300s
-
-# Grafana
-helm upgrade --install grafana grafana/grafana \
-  -f ../services/grafana/values.yaml \
-  --set 'grafana\.ini'.server.root_url=https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/grafana \
-  --namespace monitoring
-export GRAFANA_ADMIN_PASSWORD=$(kubectl get secret --namespace monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo)
-sed -i "s/^GRAFANA_ADMIN_PASSWORD=.*/GRAFANA_ADMIN_PASSWORD=$GRAFANA_ADMIN_PASSWORD/" ../../.env.$ENV
-kubectl wait -n monitoring --selector='!job-name' --for=condition=ready --all po --timeout=300s
-echo "Access Grafana at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/grafana with admin/$GRAFANA_ADMIN_PASSWORD"
-```
-
-> [!NOTE]
-> Connecting Grafana with Prometheus Data Source via this URL: `http://prometheus-server.monitoring.svc.cluster.local:80`
-> 
-> Starter Grafana Dashboard: K8s Resource Monitoring: id=`17375`
 
 ---
 

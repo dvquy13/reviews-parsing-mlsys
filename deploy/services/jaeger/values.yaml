@@ -1,0 +1,20 @@
+query:
+  resourcesPreset: nano
+  extraEnvVars:
+    - name: QUERY_BASE_PATH
+      value: /jaeger
+
+collector:
+  resourcesPreset: nano
+
+agent:
+  resourcesPreset: nano
+
+migration:
+  resourcesPreset: nano
+
+cassandra:
+  resources:
+    requests:
+      cpu: 1
+      memory: 3Gi

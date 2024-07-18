@@ -7,4 +7,6 @@ kubectl get cm | grep -v "kube" | awk 'NR>1 {print $1}' | xargs kubectl delete c
 kubectl delete --all pvc
 kubectl delete --all pv
 kubectl delete --all po
+kubectl delete --all job
 kubectl delete ns cert-manager
+kubectl delete ns monitoring

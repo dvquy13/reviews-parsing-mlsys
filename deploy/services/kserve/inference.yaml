@@ -30,3 +30,11 @@ spec:
               secretKeyRef:
                 name: app-secret
                 key: MLFLOW_TRACKING_PASSWORD
+        resources:
+          requests:
+            # Original:
+            # cpu: 1
+            # memory: 2Gi
+            # Reduced to cater with cluster resource:
+            cpu: 200m
+            memory: 2Gi
