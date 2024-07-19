@@ -2,6 +2,10 @@
 
 This project focuses on applying engineering practices to build a Machine Learning System in the domain of public reviews data.
 
+# High-level architecture
+
+![Architecture Diagram](static/RPMLS%20Architecture%20v1.drawio.svg)
+
 # Repo structure
 ```
 ├── deploy: Scripts to create the deployment resources
