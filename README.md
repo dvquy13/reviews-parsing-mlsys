@@ -87,3 +87,6 @@ poetry run python scripts/alias_new_mlflow_model_as_champion.py --run_id=<RUN_ID
 ```
 kubectl annotate -n default inferenceservice reviews-parsing-ner-aspects-mlserver deploy_timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ') --overwrite
 ```
+
+---
+To get an idea about the output of this repo, check out this [demo video on Youtube](https://www.youtube.com/watch?v=O-8_Q1GgJpM).
