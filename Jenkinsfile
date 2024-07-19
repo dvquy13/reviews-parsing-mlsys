@@ -54,6 +54,7 @@ pipeline {
                                 inferenceservice reviews-parsing-ner-aspects-mlserver \
                                 deploy_timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
                                 --overwrite
+                            kubectl wait -n default --selector='!job-name' --for=condition=ready --all po --timeout=300s
                         '''
                     }
                 }
