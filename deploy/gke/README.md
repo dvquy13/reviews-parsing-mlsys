@@ -1,15 +1,42 @@
-# Create cluster
+# Prerequisite
 
-> - Run `export ENV=<ENV>` with the target <ENV>, for example: `export ENV=staging`
+- A working GCP project
+- Gcloud SDK CLI
+  - Make sure you have run `gcloud init` and `gcloud auth application-default login` 
+- Terraform CLI
+- HuggingFace account to host the HF model
+- Dockerhub account to store the custom MLServer Docker Image
+
+> [!CAUTION]
+> Following these steps creates a GKE cluster with 4 e2-standard-2 nodes
+> Keep this cluster running for a day might cost about 10 - 20 USD
+
+> [!TIP]
+> The formatted code block in this README is intended to be pasted in to CLI and run there.
+> 
+> In between there would be manual steps required.
+
+# Create cluster
+> At repo root:
+> - `export ROOT_DIR=$(pwd) && echo $ROOT_DIR`
+> - Run `export ENV=<ENV>` with the target `$ENV`, for example: `export ENV=dev`
 > - `cd <ROOT>/deploy/gke/terraform`
-> - `terraform apply --var="env=$ENV"
+> - `terraform apply --var="env=$ENV"`
 
 # Install apps in GKE Cluster
+```
+cd $ROOT_DIR
+cp .env.example .env.$ENV
+```
 
-> - `cd <ROOT>/deploy/gke`
+> [!NOTE]
+> Update your own credentials/values for the "Starter constants" section in the new `.env.$ENV`
+
+## Get GKE cluster credentials
 
 ```
-# Init the env vars
+cd deploy/gke
+# Init the env vars by exporting the .env.$ENV file
 export $(cat ../../.env.$ENV | grep -v "^#")
 gcloud container clusters get-credentials $APP_NAME --zone $GCP_ZONE --project $GCP_PROJECT_NAME
 kubectl config use-context gke_${GCP_PROJECT_NAME}_${GCP_ZONE}_${APP_NAME}
@@ -17,9 +44,9 @@ kubectl config use-context gke_${GCP_PROJECT_NAME}_${GCP_ZONE}_${APP_NAME}
 
 ---
 
-# Set up Traffic Exposure via Ingress NGINX
+## Set up Traffic Exposure via Ingress Nginx
 
-## Cert Manager to add TLS
+### Cert Manager to add TLS
 Ref: Install with Helm: https://cert-manager.io/docs/installation/helm/
 ```
 helm repo add jetstack https://charts.jetstack.io --force-update
@@ -33,7 +60,7 @@ helm upgrade --install \
 kubectl wait --namespace cert-manager --for=condition=ready --all pod --timeout=300s
 ```
 
-## Install NGINX controller
+### Install NGINX controller
 Ref:
 - https://cert-manager.io/docs/tutorials/acme/nginx-ingress/
 - https://kk-shichao.medium.com/expose-service-using-nginx-ingress-in-kind-cluster-from-wsl2-14492e153e99
@@ -50,13 +77,14 @@ kubectl wait --for=condition=ready pod --all --timeout=300s
 sed -i 's/target: ".*"/target: "'"$IP_ADDRESS"'"/g' openapi.$ENV.yaml
 ```
 
+#### Set up Cloud Endpoints to map a FQDN with our static IP
 ```
-# Set up Cloud Endpoint to map domain with IP
 gcloud endpoints services deploy openapi.$ENV.yaml
 ```
 
-## Install our custom Ingress
+### Install our custom Ingress
 ```
+# Create in advance the `monitoring` and `cicd` namespaces so that the ingress.yaml runs without complaining
 kubectl create namespace monitoring
 kubectl create namespace cicd
 helm upgrade --install \
@@ -69,6 +97,8 @@ helm upgrade --install \
   -f ingress/values.yaml
 ```
 
+#### Check TLS applies OK
+```
 # Check if the output contains "SSL certificate verify ok"
 ssl_check=$(curl -s -I -v --stderr - "$URL" 2>&1)
 if echo "$ssl_check" | grep -q "SSL certificate verify ok"; then
@@ -76,12 +106,13 @@ if echo "$ssl_check" | grep -q "SSL certificate verify ok"; then
 else
     echo "The TLS certificate for $URL is not valid or could not be verified."
 fi
+```
 
 ---
 
-# Observability
+## Observability
 
-## Prometheus and Grafana
+### Prometheus and Grafana
 ```
 # Prometheus
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -107,7 +138,7 @@ echo "Access Grafana at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.clou
 > 
 > Starter Grafana Dashboard: K8s Resource Monitoring: id=`17375` and id=`315`
 
-## Jaeger
+### Jaeger
 ```
 helm upgrade --install jaeger oci://registry-1.docker.io/bitnamicharts/jaeger -n monitoring -f ../services/jaeger/values.yaml
 kubectl wait -n monitoring --selector='!job-name' --for=condition=ready --all po --timeout=300s
@@ -125,9 +156,10 @@ kubectl wait -n monitoring --selector='!job-name' --for=condition=ready --all po
 
 ---
 
-# CI/CD
+## CI/CD
 
-## Jenkins
+### Jenkins
+#### Deploy Jenkins on K8s
 ```
 helm repo add jenkins https://charts.jenkins.io
 helm repo update
@@ -140,10 +172,7 @@ sed -i "s/^JENKINS_ADMIN_PASSWORD=.*/JENKINS_ADMIN_PASSWORD=$JENKINS_ADMIN_PASSW
 echo "Try access Jenkins UI at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/jenkins with admin/$JENKINS_ADMIN_PASSWORD"
 ```
 
-### Set up Jenkins
-
-> [!NOTE]
-> Below are instructions to set up Jenkins:
+#### Manually configure Jenkins
 
 Install the following Jenkins plugins:
 - Kubernetes CLI
@@ -151,23 +180,23 @@ Install the following Jenkins plugins:
 
 Set up Github Webhooks:
 - Go to Github repo > Settings > Webhooks
-- Payload URL: https://dev-reviews-parsing-mlsys.endpoints.cold-embrace-240710.cloud.goog/jenkins/github-webhook/ (notice the trailing `/`)
-- Content type: application/json
-- Select individual events: Pull requests and Pushes
+  - Payload URL: https://dev-reviews-parsing-mlsys.endpoints.cold-embrace-240710.cloud.goog/jenkins/github-webhook/ (notice the trailing `/`)
+  - Content type: application/json
 
-Create Github Access Token
+Create Github Access Token:
 - Create Personal access tokens (classic)
-- All permissions
+- Manually select all permissions
 
 Set up Jenkins Pipeline:
 - Create new Multibranch Pipeline item in Jenkins
 - If want to trigger build only on certain branches, add a new "Filter by name: `^main$`", else select "All branches"
-- Add credentials, use the above token for password
+- Add credentials, use the above Github Access Token token for password
 
 Go to Manage Jenkins > Settings > Github API usage > Choose Never check rate limit
 
 #### Connect Jenkins with GKE
 
+Get a secret token from inside K8s cluster to later bind it to a Jenkins credentials
 ```
 cd ../services/jenkins/k8s-auth/manual
 kubectl apply -f jenkins-service-account.yaml
@@ -183,7 +212,7 @@ export CLUSTER_API_SERVER_URL=$(kubectl cluster-info | grep "Kubernetes control 
 
 ---
 
-# MLflow
+## MLflow
 ```
 # Install with Helm
 helm upgrade --install mlflow oci://registry-1.docker.io/bitnamicharts/mlflow -f ../services/mlflow/values.yaml
@@ -198,7 +227,7 @@ echo "Try access MLflow UI at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAM
 
 ---
 
-# Model training
+## Model training
 
 The next section works by assuming that we already have a trained model named `reviews-parsing-ner-aspects@champion`.
 
@@ -209,12 +238,12 @@ The next section works by assuming that we already have a trained model named `r
 
 ---
 
-# Deploy Model Inference Service to K8s with KServe
+## Deploy Model Inference Service to K8s with KServe
 
 Ref:
 - https://knative.dev/docs/install/yaml-install/serving/install-serving-with-yaml/#prerequisites
 
-## Install cosign
+### Install cosign
 ```
 # Ref: https://docs.sigstore.dev/system_config/installation/
 LATEST_VERSION=$(curl https://api.github.com/repos/sigstore/cosign/releases/latest | grep tag_name | cut -d : -f2 | tr -d "v\", ")
@@ -223,18 +252,18 @@ sudo dpkg -i cosign_${LATEST_VERSION}_amd64.deb
 rm -rf cosign_${LATEST_VERSION}_amd64.deb
 ```
 
-## Install required CRDs
+### Install required CRDs
 ```
 kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.14.1/serving-crds.yaml
 ```
 
-## Install core components of Knative Serving
+### Install core components of Knative Serving
 ```
 kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.14.1/serving-core.yaml
 kubectl wait -n knative-serving --for=condition=ready --all po --timeout=300s
 ```
 
-## Install Networking Layer with Istio
+### Install Networking Layer with Istio
 ```
 kubectl apply -l knative.dev/crd-install=true -f https://github.com/knative/net-istio/releases/download/knative-v1.14.1/istio.yaml
 # Do not apply the raw version of istio.yaml because of high resource request
@@ -268,7 +297,7 @@ echo "ISTIO sslip.io available at: $ISTIO_IP.sslip.io"
 > - Delete all the unscheduled/pending deployments
 > - TODO: Modify the installation instruction to download the manifest and modify the resources request there instead.
 
-## Install KServe
+### Install KServe
 ```
 kubectl apply -f https://github.com/kserve/kserve/releases/download/v0.13.0/kserve.yaml
 kubectl wait -n kserve --selector='!job-name' --for=condition=ready --all po --timeout=300s
@@ -276,7 +305,7 @@ kubectl apply -f https://github.com/kserve/kserve/releases/download/v0.13.0/kser
 kubectl wait -n kserve --selector='!job-name' --for=condition=ready --all po --timeout=300s
 ```
 
-## Configure Knative cluster to deploy images from private registry
+### Configure Knative cluster to deploy images from private registry
 
 > [!IMPORTANT]
 > Update the `../../.env.$ENV` file with your own `PRIVATE_REGISTRY_*` credentials
@@ -291,7 +320,7 @@ kubectl create secret --namespace default docker-registry $REGISTRY_CREDENTIAL_S
   --docker-password=$PRIVATE_REGISTRY_PASSWORD
 ```
 
-## Push the MLServer Inference Docker to Dockerhub
+### Push the MLServer Inference Docker to Dockerhub
 ```
 cd ../../models/reviews-parsing-ner-aspects
 make build
@@ -302,9 +331,9 @@ cd ../../deploy/gke
 > [!IMPORTANT]
 > Update the model image with tag at `../services/kserve/inference.yaml`
 
-## Deploy the MLServer
+### Deploy the MLServer
 
-### Create app-secret
+#### Create app-secret
 > [!WARNING]
 > Be careful to submit `.env` with single quote enclosing values.
 > We may need to preprocess them to make the `--from-env-file` work.
@@ -312,7 +341,7 @@ cd ../../deploy/gke
 kubectl create secret generic app-secret --from-env-file=../../.env.$ENV
 ```
 
-### Deploy the inferenceservice
+#### Deploy the inferenceservice
 ```
 kubectl apply -f ../services/kserve/inference.yaml --namespace default
 latest_revision=$(kubectl get revisions -l serving.knative.dev/service=reviews-parsing-ner-aspects-mlserver-predictor -o jsonpath='{.items[-1:].metadata.name}')
@@ -321,7 +350,7 @@ kubectl wait --selector='!job-name' --for=condition=ready --all po --timeout=300
 echo "Access the KServe Model Swagger docs at: http://reviews-parsing-ner-aspects-mlserver.default.$ISTIO_IP.sslip.io/v2/models/reviews-parsing-ner-aspects/docs"
 ```
 
-Test inference:
+#### Test inference
 ```
 curl -X 'POST' \
   "http://reviews-parsing-ner-aspects-mlserver.default.$ISTIO_IP.sslip.io/v2/models/reviews-parsing-ner-aspects/infer" \
@@ -382,8 +411,6 @@ cd autoscaler/vertical-pod-autoscaler && \
   ./hack/vpa-up.sh && \
   cd ../..
 ```
-
----
 
 ## Edit VPA's Updater min-replicas from 2 to 1 so that updater can update resource requests based on recommendation
 
