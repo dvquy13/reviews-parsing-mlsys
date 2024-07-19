@@ -6,6 +6,8 @@ This project focuses on applying engineering practices to build a Machine Learni
 
 ![Architecture Diagram](static/RPMLS%20Architecture%20v1.drawio.svg)
 
+[View in full screen](https://bit.ly/rpmls-architecture)
+
 # Repo structure
 ```
 ├── deploy: Scripts to create the deployment resources
