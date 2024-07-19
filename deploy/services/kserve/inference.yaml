@@ -6,7 +6,7 @@ metadata:
     deploy_timestamp: ""
 spec:
   predictor:
-    minReplicas: 2
+    minReplicas: 1
     imagePullSecrets:
     - name: reviews-parsing-ner-aspects-container-registry
     containers:

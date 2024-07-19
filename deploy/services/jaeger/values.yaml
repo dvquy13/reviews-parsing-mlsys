@@ -22,5 +22,5 @@ migration:
 cassandra:
   resources:
     requests:
-      cpu: 1
+      cpu: 700m
       memory: 3Gi
