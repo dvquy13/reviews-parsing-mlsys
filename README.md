@@ -65,7 +65,7 @@ Install these prerequisites:
 ### Install packages
 
 ```
-# Create a new Pytohon 3.9 environment
+# Create a new Python 3.9 environment
 # Example conda environment at current dir
 conda create --prefix ./.venv python=3.9
 poetry env use ./.venv/bin/python
