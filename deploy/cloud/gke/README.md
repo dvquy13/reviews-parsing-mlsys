@@ -166,7 +166,7 @@ helm upgrade --install \
   main-ingress \
   ./ingress \
   -f ingress/values.yaml
-kubectl wait --for=condition=ready pod --all --timeout=30s
+kubectl wait --selector='!job-name' --for=condition=ready pod --all --timeout=30s
 ```
 
 #### Check TLS applies OK

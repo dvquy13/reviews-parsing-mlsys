@@ -19,8 +19,7 @@ spec:
     - host: {{ include "mainIngress.hostUrl" . }}
       http:
         paths:
-          - pathType: ImplementationSpecific
-            # path: /
+          - pathType: Prefix
             path: /mlflow/api(/|$)(.*)
             backend:
               service:
@@ -50,7 +49,7 @@ spec:
     - host: {{ include "mainIngress.hostUrl" . }}
       http:
         paths:
-          - pathType: ImplementationSpecific
+          - pathType: Prefix
             path: /mlflow(/|$)(.*)
             backend:
               service:
@@ -80,7 +79,7 @@ spec:
     - host: {{ include "mainIngress.hostUrl" . }}
       http:
         paths:
-          - pathType: ImplementationSpecific
+          - pathType: Prefix
             path: /grafana(/|$)(.*)
             backend:
               service:
