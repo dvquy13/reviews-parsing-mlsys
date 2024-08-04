@@ -20,8 +20,13 @@ RUN pip install -r requirements.no-gpu.txt && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
 
+# Remove as no need after installation
+RUN rm -f requirements.no-gpu.txt
+
 # Copy the rest of the application files
 COPY model-settings.json model.py settings.json /app/
+
+EXPOSE 8080
 
 # Set the entrypoint
 ENTRYPOINT ["mlserver", "start", "."]

@@ -20,7 +20,7 @@
 > At repo root:
 > - `export ROOT_DIR=$(pwd) && echo $ROOT_DIR`
 > - Run `export ENV=<ENV>` with the target `$ENV`, for example: `export ENV=dev`
-> - `cd <ROOT>/deploy/gke/terraform`
+> - `cd $ROOT_DIR/deploy/cloud/gke/terraform`
 > - `terraform apply --var="env=$ENV"`
 
 # Install apps in GKE Cluster
@@ -35,9 +35,9 @@ cp .env.example .env.$ENV
 ## Get GKE cluster credentials
 
 ```
-cd deploy/gke
+cd deploy/cloud/gke
 # Init the env vars by exporting the .env.$ENV file
-export $(cat ../../.env.$ENV | grep -v "^#")
+export $(cat ../../../.env.$ENV | grep -v "^#")
 gcloud container clusters get-credentials $APP_NAME --zone $GCP_ZONE --project $GCP_PROJECT_NAME
 kubectl config use-context gke_${GCP_PROJECT_NAME}_${GCP_ZONE}_${APP_NAME}
 ```
@@ -74,10 +74,38 @@ helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
 helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx --set controller.service.loadBalancerIP=$IP_ADDRESS
 kubectl wait --for=condition=ready pod --all --timeout=300s
-sed -i 's/target: ".*"/target: "'"$IP_ADDRESS"'"/g' openapi.$ENV.yaml
 ```
 
 #### Set up Cloud Endpoints to map a FQDN with our static IP
+```
+cp openapi.example.yaml openapi.$ENV.yaml
+sed -i 's/target: ".*"/target: "'"$IP_ADDRESS"'"/g' openapi.$ENV.yaml
+
+# ---
+# Replace the placeholders in openapi.$ENV.yaml
+
+## Find all placeholders in the format <PLACEHOLDER>
+placeholders=$(grep -o "<[^>]*>" "openapi.$ENV.yaml" | sort | uniq)
+
+## Iterate over each placeholder
+echo "$placeholders" | while read -r placeholder; 
+do
+  # Remove the enclosing <>
+  var_name="${placeholder:1:-1}"
+  
+  # Get the value of the environment variable
+  var_value=$(eval echo \$$var_name)
+  
+  # Escape special characters in the variable value
+  escaped_value=$(echo "$var_value" | sed 's/[\/&]/\\&/g')
+
+  # Substitute the placeholder with the variable value
+  sed -i "s/$placeholder/$escaped_value/g" "openapi.$ENV.yaml"
+done
+
+# ---
+```
+
 ```
 gcloud endpoints services deploy openapi.$ENV.yaml
 ```
@@ -95,11 +123,16 @@ helm upgrade --install \
   main-ingress \
   ./ingress \
   -f ingress/values.yaml
+kubectl wait --for=condition=ready pod --all --timeout=30s
 ```
 
 #### Check TLS applies OK
 ```
+kubectl wait --for=condition=ready cert --all --timeout=300s
+export BASE_URL=$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog
+sed -i "s/^BASE_URL=.*/BASE_URL=$BASE_URL/" ../../../.env.$ENV
 # Check if the output contains "SSL certificate verify ok"
+URL=https://$BASE_URL
 ssl_check=$(curl -s -I -v --stderr - "$URL" 2>&1)
 if echo "$ssl_check" | grep -q "SSL certificate verify ok"; then
     echo "The TLS certificate for $URL is valid."
@@ -124,11 +157,11 @@ kubectl wait -n monitoring --selector='!job-name' --for=condition=ready --all po
 
 # Grafana
 helm upgrade --install grafana grafana/grafana \
-  -f ../services/grafana/values.yaml \
+  -f ../../services/grafana/values.yaml \
   --set 'grafana\.ini'.server.root_url=https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/grafana \
   --namespace monitoring
 export GRAFANA_ADMIN_PASSWORD=$(kubectl get secret --namespace monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo)
-sed -i "s/^GRAFANA_ADMIN_PASSWORD=.*/GRAFANA_ADMIN_PASSWORD=$GRAFANA_ADMIN_PASSWORD/" ../../.env.$ENV
+sed -i "s/^GRAFANA_ADMIN_PASSWORD=.*/GRAFANA_ADMIN_PASSWORD=$GRAFANA_ADMIN_PASSWORD/" ../../../.env.$ENV
 kubectl wait -n monitoring --selector='!job-name' --for=condition=ready --all po --timeout=300s
 echo "Access Grafana at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/grafana with admin/$GRAFANA_ADMIN_PASSWORD"
 ```
@@ -140,14 +173,12 @@ echo "Access Grafana at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.clou
 
 ### Jaeger
 ```
-helm upgrade --install jaeger oci://registry-1.docker.io/bitnamicharts/jaeger -n monitoring -f ../services/jaeger/values.yaml
+helm upgrade --install jaeger oci://registry-1.docker.io/bitnamicharts/jaeger -n monitoring -f ../../services/jaeger/values.yaml
 kubectl wait -n monitoring --selector='!job-name' --for=condition=ready --all po --timeout=300s
 ```
 
 > [!NOTE]
-> You can connect Grafana to Jaeger by using the URL: `http://jaeger-query.monitoring.svc.cluster.local:16686/jaeger`
->
-> Notice the endpoint `/jaeger` added to the end of the URL
+> You can connect Grafana to Jaeger by using the URL: `http://jaeger-query.monitoring.svc.cluster.local:16686/jaeger`. Notice the endpoint `/jaeger` added to the end of the URL
 > 
 > Ref: https://stackoverflow.com/a/72904828
 
@@ -168,7 +199,7 @@ helm install jenkins jenkins/jenkins --namespace cicd --create-namespace \
   --set controller.jenkinsUriPrefix=/jenkins
 kubectl wait -n cicd --for=condition=ready --all po --timeout=300s
 export JENKINS_ADMIN_PASSWORD=$(kubectl exec --namespace cicd -it svc/jenkins -c jenkins -- /bin/cat /run/secrets/additional/chart-admin-password && echo)
-sed -i "s/^JENKINS_ADMIN_PASSWORD=.*/JENKINS_ADMIN_PASSWORD=$JENKINS_ADMIN_PASSWORD/" ../../.env.$ENV
+sed -i "s/^JENKINS_ADMIN_PASSWORD=.*/JENKINS_ADMIN_PASSWORD=$JENKINS_ADMIN_PASSWORD/" ../../../.env.$ENV
 echo "Try access Jenkins UI at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/jenkins with admin/$JENKINS_ADMIN_PASSWORD"
 ```
 
@@ -177,6 +208,7 @@ echo "Try access Jenkins UI at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NA
 Install the following Jenkins plugins:
 - Kubernetes CLI
 - Github
+- Github Branch Source
 
 Set up Github Webhooks:
 - Go to Github repo > Settings > Webhooks
@@ -184,13 +216,17 @@ Set up Github Webhooks:
   - Content type: application/json
 
 Create Github Access Token:
+- Go to Github > Settings (Personal) > Developer settings
 - Create Personal access tokens (classic)
 - Manually select all permissions
+- Save the token
 
 Set up Jenkins Pipeline:
 - Create new Multibranch Pipeline item in Jenkins
+- Branch Sources: Github
+  - Username: Github username
+  - Password: use the above Github Access Token
 - If want to trigger build only on certain branches, add a new "Filter by name: `^main$`", else select "All branches"
-- Add credentials, use the above Github Access Token token for password
 
 Go to Manage Jenkins > Settings > Github API usage > Choose Never check rate limit
 
@@ -198,15 +234,28 @@ Go to Manage Jenkins > Settings > Github API usage > Choose Never check rate lim
 
 Get a secret token from inside K8s cluster to later bind it to a Jenkins credentials
 ```
-cd ../services/jenkins/k8s-auth/manual
+cd ../../services/jenkins/k8s-auth/manual
 kubectl apply -f jenkins-service-account.yaml
 kubectl apply -f jenkins-clusterrolebinding.yaml
 kubectl apply -f jenkins-token-secret.yaml
+
+echo "Waiting for secret jenkins-robot-token to appear..."
+
+# Loop until the secret exists
+until kubectl get secret jenkins-robot-token > /dev/null 2>&1; do
+  echo "Waiting for secret jenkins-robot-token..."
+  sleep 1  # Wait for 1 second before checking again
+done
+
+echo "Secret jenkins-robot-token has appeared."
+
 export JENKINS_ROBOT_TOKEN=$(kubectl get secret jenkins-robot-token -o jsonpath='{.data.token}' | base64 --decode) && echo "JENKINS_ROBOT_TOKEN: $JENKINS_ROBOT_TOKEN"
 export CLUSTER_API_SERVER_URL=$(kubectl cluster-info | grep "Kubernetes control plane" | grep -oP 'https?://\S+') && echo "CLUSTER_API_SERVER_URL: $CLUSTER_API_SERVER_URL"
+cd $ROOT_DIR/deploy/cloud/gke
 ```
 
 > [!NOTE]
+> Go to Manage Jenkins > Credentials > System > Global credentials (unrestricted)
 > - Add the value of `JENKINS_ROBOT_TOKEN` variable to Jenkins Credentials > Secret text with id credential ID: `rpmls-jenkins-robot-token`
 > - Add the value of `CLUSTER_API_SERVER_URL` variable to Jenkins Credentials > Secret text with id credential ID: `gke-cluster-api-server-url`
 
@@ -215,14 +264,18 @@ export CLUSTER_API_SERVER_URL=$(kubectl cluster-info | grep "Kubernetes control 
 ## MLflow
 ```
 # Install with Helm
-helm upgrade --install mlflow oci://registry-1.docker.io/bitnamicharts/mlflow -f ../services/mlflow/values.yaml
+helm upgrade --install mlflow oci://registry-1.docker.io/bitnamicharts/mlflow -f ../../services/mlflow/values.yaml
+kubectl wait --selector='!job-name' --for=condition=ready --all po --timeout=300s
+export MLFLOW_TRACKING_USERNAME=$(kubectl get secret --namespace default mlflow-tracking -o jsonpath="{ .data.admin-user }" | base64 -d)
+sed -i "s/^MLFLOW_TRACKING_USERNAME=.*/MLFLOW_TRACKING_USERNAME=$MLFLOW_TRACKING_USERNAME/" ../../../.env.$ENV
 export MLFLOW_TRACKING_PASSWORD=$(kubectl get secret --namespace default mlflow-tracking -o jsonpath="{.data.admin-password }" | base64 -d)
-sed -i "s/^MLFLOW_TRACKING_PASSWORD=.*/MLFLOW_TRACKING_PASSWORD=$MLFLOW_TRACKING_PASSWORD/" ../../.env.$ENV
-kubectl wait --selector='!job-name' --for=condition=ready --all po --timeout=300s 
-echo "Try access MLflow UI at: https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/mlflow with $MLFLOW_TRACKING_USERNAME/$MLFLOW_TRACKING_PASSWORD"
+sed -i "s/^MLFLOW_TRACKING_PASSWORD=.*/MLFLOW_TRACKING_PASSWORD=$MLFLOW_TRACKING_PASSWORD/" ../../../.env.$ENV
+export MLFLOW_TRACKING_URI=https://$ENV-$APP_NAME.endpoints.$GCP_PROJECT_NAME.cloud.goog/mlflow
+sed -i "s#^MLFLOW_TRACKING_URI=.*#MLFLOW_TRACKING_URI=$MLFLOW_TRACKING_URI#" ../../../.env.$ENV
+echo "Try access MLflow UI at: $MLFLOW_TRACKING_URI with $MLFLOW_TRACKING_USERNAME/$MLFLOW_TRACKING_PASSWORD"
 # Disable VPA after finding that VPA update can make MLflow Tracking Server to stop working
 # Apply VPA
-# kubectl apply -f ../services/mlflow/vpa.yaml
+# kubectl apply -f ../../services/mlflow/vpa.yaml
 ```
 
 ---
@@ -234,7 +287,7 @@ The next section works by assuming that we already have a trained model named `r
 > [!NOTE]
 > To create this model: 
 > - Run the notebooks/train.ipynb notebook
-> - Register and create the alias `champion` for the trained model on MLflow
+> - Register the model with name `reviews-parsing-ner-aspects` and create the alias `champion` for the newly trained version on MLflow
 
 ---
 
@@ -269,7 +322,7 @@ kubectl apply -l knative.dev/crd-install=true -f https://github.com/knative/net-
 # Do not apply the raw version of istio.yaml because of high resource request
 # kubectl apply -f https://github.com/knative/net-istio/releases/download/knative-v1.14.1/istio.yaml
 # Download the istio.yaml file and modify resource request
-kubectl apply -f ../services/istio/istio.yaml
+kubectl apply -f ../../services/istio/istio.yaml
 kubectl apply -f https://github.com/knative/net-istio/releases/download/knative-v1.14.1/net-istio.yaml
 kubectl wait -n istio-system --for=condition=ready --all po --timeout=300s
 kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.14.1/serving-default-domain.yaml
@@ -284,7 +337,7 @@ while true; do
     sleep 10
   fi
 done
-sed -i "s/^ISTIO_IP=.*/ISTIO_IP=$ISTIO_IP/" ../../.env.$ENV
+sed -i "s/^ISTIO_IP=.*/ISTIO_IP=$ISTIO_IP/" ../../../.env.$ENV
 echo "ISTIO sslip.io available at: $ISTIO_IP.sslip.io"
 ```
 
@@ -308,11 +361,11 @@ kubectl wait -n kserve --selector='!job-name' --for=condition=ready --all po --t
 ### Configure Knative cluster to deploy images from private registry
 
 > [!IMPORTANT]
-> Update the `../../.env.$ENV` file with your own `PRIVATE_REGISTRY_*` credentials
+> Update the `../../../.env.$ENV` file with your own `PRIVATE_REGISTRY_*` credentials
 
 Ref: https://knative.dev/docs/serving/deploying-from-private-registry/
 ```
-export $(cat ../../.env.$ENV | grep -v "^#")
+export $(cat ../../../.env.$ENV | grep -v "^#")
 kubectl create secret --namespace default docker-registry $REGISTRY_CREDENTIAL_SECRETS \
   --docker-server=$PRIVATE_REGISTRY_URL \
   --docker-email=$PRIVATE_REGISTRY_EMAIL \
@@ -322,14 +375,14 @@ kubectl create secret --namespace default docker-registry $REGISTRY_CREDENTIAL_S
 
 ### Push the MLServer Inference Docker to Dockerhub
 ```
-cd ../../models/reviews-parsing-ner-aspects
+cd ../../../models/reviews-parsing-ner-aspects
 make build
 make push
-cd ../../deploy/gke
+cd ../../deploy/cloud/gke
 ```
 
 > [!IMPORTANT]
-> Update the model image with tag at `../services/kserve/inference.yaml`
+> Update the model image with tag at `../../services/kserve/inference.yaml`
 
 ### Deploy the MLServer
 
@@ -338,12 +391,13 @@ cd ../../deploy/gke
 > Be careful to submit `.env` with single quote enclosing values.
 > We may need to preprocess them to make the `--from-env-file` work.
 ```
-kubectl create secret generic app-secret --from-env-file=../../.env.$ENV
+kubectl create secret generic app-secret --from-env-file=../../../.env.$ENV
 ```
 
 #### Deploy the inferenceservice
 ```
-kubectl apply -f ../services/kserve/inference.yaml --namespace default
+kubectl apply -f ../../services/kserve/inference.yaml --namespace default
+kubectl wait --for=condition=ready --all revision --timeout=30s
 latest_revision=$(kubectl get revisions -l serving.knative.dev/service=reviews-parsing-ner-aspects-mlserver-predictor -o jsonpath='{.items[-1:].metadata.name}')
 kubectl wait --for=condition=ready revision $latest_revision --timeout=300s
 kubectl wait --selector='!job-name' --for=condition=ready --all po --timeout=300s

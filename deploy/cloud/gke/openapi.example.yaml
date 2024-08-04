@@ -3,9 +3,9 @@ info:
   description: "[<ENV>] Reviews Parsing MLSys"
   title: "[<ENV>] Reviews Parsing MLSys"
   version: "0.1.0"
-host: "<ENV>-<APP_NAME>.endpoints.<GCP_PROJECT_ID>.cloud.goog"
+host: "<ENV>-<APP_NAME>.endpoints.<GCP_PROJECT_NAME>.cloud.goog"
 x-google-endpoints:
-    - name: "<ENV>-<APP_NAME>.endpoints.<GCP_PROJECT_ID>.cloud.goog"
+    - name: "<ENV>-<APP_NAME>.endpoints.<GCP_PROJECT_NAME>.cloud.goog"
       target: "<IP_ADDRESS>"
 schemes:
   - "https"

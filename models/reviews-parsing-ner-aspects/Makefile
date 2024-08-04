@@ -27,7 +27,7 @@ jaeger-up:
 		jaegertracing/all-in-one:1.59
 
 up:
-	docker compose up -d
+	docker compose -f compose.yaml up -d
 
 up-build:
-	docker compose up -d --build
+	docker compose -f compose.yaml up -d --build
