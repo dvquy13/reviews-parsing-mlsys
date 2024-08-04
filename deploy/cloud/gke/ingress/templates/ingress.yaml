@@ -9,6 +9,10 @@ metadata:
     cert-manager.io/issuer: {{ .Values.letsencryptIssuer }}
     nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/rewrite-target: "/api/$2"
+    {{- with .Values.ingress.whitelistIpsAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/whitelist-source-range: {{ join "," .Values.ingress.whitelistIPs | quote }}
 spec:
   ingressClassName: nginx
   tls:
@@ -39,6 +43,10 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     cert-manager.io/issuer: {{ .Values.letsencryptIssuer }}
     nginx.ingress.kubernetes.io/use-regex: "true"
+    {{- with .Values.ingress.whitelistIpsAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/whitelist-source-range: {{ join "," .Values.ingress.whitelistIPs | quote }}
 spec:
   ingressClassName: nginx
   tls:
@@ -69,6 +77,10 @@ metadata:
     cert-manager.io/issuer: {{ .Values.letsencryptIssuer }}
     nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/rewrite-target: "/$2"
+    {{- with .Values.ingress.whitelistIpsAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/whitelist-source-range: {{ join "," .Values.ingress.whitelistIPs | quote }}
 spec:
   ingressClassName: nginx
   tls:
@@ -98,6 +110,10 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     cert-manager.io/issuer: {{ .Values.letsencryptIssuer }}
     nginx.ingress.kubernetes.io/use-regex: "true"
+    {{- with .Values.ingress.whitelistIpsAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/whitelist-source-range: {{ join "," .Values.ingress.whitelistIPs | quote }}
 spec:
   ingressClassName: nginx
   tls:
@@ -127,6 +143,10 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     cert-manager.io/issuer: {{ .Values.letsencryptIssuer }}
     nginx.ingress.kubernetes.io/use-regex: "true"
+    {{- with .Values.ingress.whitelistIpsAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/whitelist-source-range: {{ join "," .Values.ingress.whitelistIPs | quote }}
 spec:
   ingressClassName: nginx
   tls:

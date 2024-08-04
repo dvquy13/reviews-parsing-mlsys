@@ -115,8 +115,11 @@ export IP_ADDRESS=$(gcloud compute addresses list | grep $ENV-$APP_NAME | awk '{
 ## Create Nginx Ingress Controller to listen to request from the static IP
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
-helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx --set controller.service.loadBalancerIP=$IP_ADDRESS
-kubectl wait --for=condition=ready pod --all --timeout=300s
+kubectl apply -f ../../services/nginx-controller/configmap.yaml
+helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx \
+  --set controller.service.loadBalancerIP=$IP_ADDRESS \
+  -f ../../services/nginx-controller/values.yaml
+kubectl wait --selector='!job-name' --for=condition=ready pod --all --timeout=300s
 ```
 
 #### Set up Cloud Endpoints to map a FQDN with our static IP

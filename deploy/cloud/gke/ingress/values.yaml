@@ -14,3 +14,9 @@ namespaces:
   - default
   - monitoring
   - cicd
+
+# Below is to configure Nginx IP Whitelisting to work with GKE Inherent Traffic Routing
+ingress:
+  whitelistIpsAnnotations:
+  whitelistIPs:
+    - "<IP_ADDRESS>/32"
