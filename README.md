@@ -87,7 +87,7 @@ poetry install
 ```
 
 ## Set up GKE
-Follow instructions at [deploy/gke](deploy/gke/README.md)
+Follow instructions at [deploy/cloud/gke](deploy/cloud/gke/README.md)
 
 # Deploy new KServe model
 ## Alias the champion model with new version
