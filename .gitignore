@@ -3,7 +3,8 @@
 .vscode/
 
 .venv/
-.env
+**/.env*
+!**/.env.example
 
 data/*
 !data/.gitkeep
@@ -12,3 +13,16 @@ notebooks/*
 !notebooks/*.ipynb
 
 **/*.log
+**/nohup.out
+
+**/.terraform*
+**/*.tfstate*
+
+# openapi.yaml files contain IP address
+**/openapi.*.yaml
+!**/openapi.example.yaml
+# cert-issuer.yaml files contain email address
+**/cert-issuer.*.yaml
+!**/cert-issuer.example.yaml
+
+**/.secret*

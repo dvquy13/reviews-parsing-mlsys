@@ -1,0 +1,23 @@
+services:
+  mlserver:
+    container_name: mlserver
+    build:
+      context: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - ../../.env.staging
+      - .env
+
+  jaeger:
+    container_name: jaeger
+    # Uses 1.57 as at Jul 17th 2024 it is the latest K8s jaeger-operator release 
+    image: jaegertracing/all-in-one:1.57
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      # Below is to enable connection from all host so that mlserver can connect
+      - COLLECTOR_OTLP_HTTP_HOST_PORT=:4318

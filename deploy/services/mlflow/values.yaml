@@ -1,0 +1,18 @@
+tracking:
+  service:
+    type: ClusterIP
+  extraArgs:
+    - "--static-prefix=/mlflow"
+  extraEnvVars:
+    - name: GUNICORN_CMD_ARGS
+      value: "--log-level debug"
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1Gi
+
+run:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
