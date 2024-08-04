@@ -2,6 +2,18 @@
 
 This project focuses on applying engineering practices to build a Machine Learning System in the domain of public reviews data.
 
+TOC:
+- [Reviews Parsing MLSys](#reviews-parsing-mlsys)
+- [High-level architecture](#high-level-architecture)
+- [Repo structure](#repo-structure)
+- [Set up](#set-up)
+  - [Python](#python)
+    - [Install packages](#install-packages)
+  - [Set up GKE](#set-up-gke)
+- [Deploy new KServe model](#deploy-new-kserve-model)
+  - [Alias the champion model with new version](#alias-the-champion-model-with-new-version)
+  - [Restart KServe Inference Service and update latest model](#restart-kserve-inference-service-and-update-latest-model)
+
 # High-level architecture
 
 ![Architecture Diagram](static/RPMLS%20Architecture%20v1.drawio.svg)
