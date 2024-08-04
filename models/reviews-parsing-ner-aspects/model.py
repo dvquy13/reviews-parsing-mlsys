@@ -1,15 +1,14 @@
-import os
 import json
+import os
+
+import mlflow
 from loguru import logger
 from mlserver import MLModel, types
 from mlserver.codecs import StringCodec
 from mlserver.types import InferenceRequest, InferenceResponse, ResponseOutput
-import mlflow
-
-from opentelemetry.sdk.resources import SERVICE_NAME, Resource
-
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
