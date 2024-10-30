@@ -1,0 +1,6 @@
+tracking:
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: true
+    ingressClassName: nginx

@@ -1,0 +1,46 @@
+apiVersion: "serving.kserve.io/v1beta1"
+kind: "InferenceService"
+metadata:
+  name: "reviews-parsing-ner-aspects-mlserver"
+  annotations:
+    deploy_timestamp: ""
+spec:
+  predictor:
+    minReplicas: 1
+    imagePullSecrets:
+    - name: reviews-parsing-ner-aspects-container-registry
+    containers:
+      - name: "mlserver"
+        image: "dvquy13/reviews-parsing-ner-aspects:0.1.4"
+        imagePullPolicy: "Always"
+        ports:
+          - containerPort: 8080
+            protocol: TCP
+        env:
+          - name: PROTOCOL
+            value: "v2"
+          - name: MLFLOW_TRACKING_URI
+            valueFrom:
+              secretKeyRef:
+                name: app-secret
+                key: MLFLOW_TRACKING_URI
+          - name: MLFLOW_TRACKING_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: app-secret
+                key: MLFLOW_TRACKING_USERNAME
+          - name: MLFLOW_TRACKING_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: app-secret
+                key: MLFLOW_TRACKING_PASSWORD
+          - name: JAEGER_URL
+            value: "http://jaeger-collector.monitoring.svc.cluster.local:4318"
+        resources:
+          requests:
+            # Original:
+            # cpu: 1
+            # memory: 2Gi
+            # Reduced to cater with cluster resource:
+            cpu: 200m
+            memory: 2Gi
